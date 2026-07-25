@@ -1,5 +1,13 @@
 # real-shadows — design spec
 
+> **superseded (2026-07-24):** this is the pre-implementation design, kept as
+> history. the shipped api differs in places — `handle.setLocation()` not
+> `update()`, `current()` not `now()`, option `now` not `date`, full-word
+> fields (`altitude`/`azimuth`/`degrees`/`direction`), the oracle is
+> astronomy-engine (sun < 0.05°, moon < 0.2°, parallax included), and alpha
+> is a linear `minAlpha→maxAlpha` ramp. **the README is the accurate
+> reference.**
+
 **Date:** 2026-07-22
 **Status:** approved design, pre-implementation
 **Origin:** extracted from zayd.wtf's `sky-almanac.js` (the sun/moon-driven shadow system)

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>real-shadows — shadows that follow the real sun</title>
+<meta name="description" content="drag through the day and watch the light move. a zero-dependency library that drives css shadows from the real position of the sun and moon.">
+<style>
+  :root {
+    --paper: #f4f1ea;
+    --ink: #1a1a1a;
+    --accent: #ff8040;
+    --line: 1px solid var(--ink);
+    /* the library writes these; the fallbacks are its no-location defaults */
+    --rs-x: 5px;
+    --rs-y: 5px;
+    --rs-blur: 0px;
+    --rs-alpha: 0.6;
+  }
+  [data-sky="night"], [data-sky="dusk"] {
+    --paper: #17171c;
+    --ink: #e8e6e1;
+    --accent: #9b7dff;
+  }
+  [data-sky="golden"] {
+    --paper: #f2e9d8;
+  }
+
+  * { box-sizing: border-box; }
+  html { text-transform: lowercase; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: background 0.6s, color 0.6s;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  main { width: 100%; max-width: 720px; }
+
+  h1 { font-size: 1.4rem; font-weight: 700; margin: 0 0 0.25rem; }
+  .sub { margin: 0 0 2rem; opacity: 0.75; }
+  .sub a { color: var(--accent); }
+
+  /* every card carries the sun-driven shadow */
+  .card {
+    border: var(--line);
+    background: var(--paper);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgba(0, 0, 0, var(--rs-alpha));
+    transition: box-shadow 0.3s linear, background 0.6s;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .grid .card { margin: 0; aspect-ratio: 1.2; display: flex; align-items: end; }
+
+  label { display: block; margin: 0.75rem 0 0.25rem; font-weight: 700; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  select, button {
+    font: inherit;
+    text-transform: lowercase;
+    color: var(--ink);
+    background: var(--paper);
+    border: var(--line);
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+  }
+  button:hover, select:hover { background: var(--accent); }
+
+  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem 1.5rem; }
+  .readout div { white-space: nowrap; }
+  .readout b { display: block; font-size: 0.75rem; opacity: 0.6; font-weight: 400; }
+
+  .row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+  .foot { margin-top: 3rem; opacity: 0.7; font-size: 0.85rem; }
+  .foot a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>real-shadows</h1>
+  <p class="sub">shadows that follow the real sun. drag the day —
+    <a href="https://github.com/zaydiscold/real-shadows">github</a> ·
+    <a href="https://www.npmjs.com/package/real-shadows">npm</a></p>
+
+  <section class="card" id="controls">
+    <div class="row">
+      <label for="place" style="margin:0">place</label>
+      <select id="place"></select>
+      <button id="live" title="follow the actual clock">live</button>
+    </div>
+    <label for="time">time of day <span id="clock"></span></label>
+    <input id="time" type="range" min="0" max="1439" step="1" value="720">
+    <label for="doy">day of year <span id="date"></span></label>
+    <input id="doy" type="range" min="0" max="364" step="1" value="172">
+  </section>
+
+  <div class="grid">
+    <div class="card">card</div>
+    <div class="card">card</div>
+    <div class="card">card</div>
+    <div class="card">card</div>
+  </div>
+
+  <section class="card">
+    <div class="readout" id="readout"></div>
+  </section>
+
+  <p class="foot">
+    every shadow on this page is one css line:
+    <code>box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgba(0,0,0,var(--rs-alpha))</code>.
+    the library computes where the sun — or at night, the moon — actually is for the
+    chosen place and time, and writes those four variables. the page tint follows
+    <code>data-sky</code>.
+  </p>
+</main>
+
+<script type="module">
+  // when developing locally, `npm run demo` serves ../dist; the published
+  // page uses the same file copied in by the deploy workflow
+  import { shadowVector, skyPhase, shadowBearing, realShadows }
+    from './real-shadows.js';
+
+  const PLACES = {
+    'san francisco': [37.77, -122.42, 'America/Los_Angeles'],
+    'new york': [40.71, -74.01, 'America/New_York'],
+    'london': [51.51, -0.13, 'Europe/London'],
+    'tokyo': [35.68, 139.69, 'Asia/Tokyo'],
+    'sydney': [-33.87, 151.21, 'Australia/Sydney'],
+    'reykjavik': [64.15, -21.94, 'Atlantic/Reykjavik'],
+    'quito': [-0.18, -78.47, 'America/Guayaquil'],
+    'longyearbyen': [78.22, 15.65, 'Arctic/Longyearbyen'],
+  };
+
+  // the zone's utc offset in hours at a given instant — dst-correct,
+  // courtesy of the browser's own tz database
+  function utcOffsetHours(timeZone, at) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, timeZoneName: 'longOffset',
+    }).formatToParts(at);
+    const name = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+    const m = name.match(/GMT([+-])(\d{2}):(\d{2})/);
+    if (!m) return 0; // GMT itself
+    return (m[1] === '-' ? -1 : 1) * (Number(m[2]) + Number(m[3]) / 60);
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const placeSel = $('place'), timeEl = $('time'), doyEl = $('doy');
+
+  for (const name of Object.keys(PLACES)) {
+    const o = document.createElement('option');
+    o.textContent = name;
+    placeSel.appendChild(o);
+  }
+
+  let live = false;
+  let handle = null;
+
+  // Scrubbed time is interpreted as LOCAL time at the chosen place. The
+  // offset is looked up for the scrubbed day itself, so dst is honored.
+  function scrubbedDate() {
+    const [, , zone] = PLACES[placeSel.value];
+    const doy = Number(doyEl.value);
+    const mins = Number(timeEl.value);
+    const start = Date.UTC(2026, 0, 1, 0, 0, 0);
+    const approx = new Date(start + doy * 86400000 + mins * 60000);
+    const utcOff = utcOffsetHours(zone, approx);
+    return new Date(start + doy * 86400000 + (mins - utcOff * 60) * 60000);
+  }
+
+  function apply() {
+    const [lat, lon] = PLACES[placeSel.value];
+    const when = live ? new Date() : scrubbedDate();
+
+    handle?.stop();
+    handle = realShadows({ lat, lon, now: when, interval: 6e7 });
+
+    render(when, lat, lon);
+  }
+
+  function render(when, lat, lon) {
+    const v = shadowVector(when, lat, lon);
+    const phase = skyPhase(when, lat, lon);
+    const bearing = shadowBearing(when, lat, lon);
+
+    const [, , zone] = PLACES[placeSel.value];
+    const local = new Date(when.getTime() + utcOffsetHours(zone, when) * 3600000);
+    $('clock').textContent = '· ' + local.toISOString().slice(11, 16);
+    $('date').textContent = '· ' + local.toISOString().slice(5, 10);
+
+    const rows = {
+      source: v.source,
+      sky: phase.sky,
+      'sun altitude': phase.sunAltitude.toFixed(1) + '°',
+      offset: `${v.dx}px, ${v.dy}px`,
+      alpha: v.alpha,
+      'caster alt/az': v.altitude === null ? '—' : `${v.altitude.toFixed(0)}° / ${v.azimuth.toFixed(0)}°`,
+      sundial: bearing ? `aim top ${Math.round(bearing.degrees)}° (${bearing.direction})` : '—',
+    };
+    $('readout').innerHTML = Object.entries(rows)
+      .map(([k, val]) => `<div><b>${k}</b>${val}</div>`)
+      .join('');
+  }
+
+  placeSel.addEventListener('change', apply);
+  timeEl.addEventListener('input', () => { live = false; apply(); });
+  doyEl.addEventListener('input', () => { live = false; apply(); });
+  $('live').addEventListener('click', () => { live = true; apply(); });
+
+  apply();
+</script>
+</body>
+</html>
