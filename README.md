@@ -7,7 +7,7 @@
 <p align="center">shadows that follow the real sun. and at night, the real moon.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/gzip-~3_kB-B4A7D6?style=flat-square&labelColor=1a1a2e" alt="size" />
+  <img src="https://img.shields.io/badge/gzip-~4_kB-B4A7D6?style=flat-square&labelColor=1a1a2e" alt="size" />
   <img src="https://img.shields.io/github/actions/workflow/status/zaydiscold/real-shadows/ci.yml?style=flat-square&labelColor=1a1a2e" alt="ci" />
   <img src="https://img.shields.io/badge/dependencies-0-9b7dff?style=flat-square&labelColor=1a1a2e" alt="zero dependencies" />
   <img src="https://img.shields.io/badge/license-MIT-9b7dff?style=flat-square&labelColor=1a1a2e" alt="license" />
@@ -49,7 +49,8 @@ offset instead of disappearing.
 
 no network calls, no permissions, no dependencies. the astronomy is computed
 locally from the clock, so it works offline, in node, and in any framework or
-none. 3.7 kB gzipped as an es module, 3.0 kB as the script-tag build.
+none. 3.9 kB gzipped as an es module, 3.2 kB as the script-tag build
+(checked by `npm run size`).
 
 it also stamps `data-sky="day|golden|dusk|night"` and `data-sun="up|down"` on the
 root element, which makes sun-driven theming (golden-hour tints, a dark mode that

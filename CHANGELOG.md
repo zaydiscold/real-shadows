@@ -2,7 +2,17 @@
 
 ## 1.0.0
 
-initial release. sun and moon ephemeris (schlyter, oracle-tested against
-astronomy-engine: sun < 0.05°, moon < 0.2°), the shadow model with the
-sun→moon→neutral handoff, the css custom-property applier, sky-phase
-attributes, and the sundial bearing.
+initial release.
+
+- sun and moon ephemeris (schlyter), oracle-tested against astronomy-engine
+  on every ci run: sun < 0.05°, moon < 0.2° (topocentric parallax applied)
+- the shadow model: length and lean from altitude and azimuth, hemisphere-aware
+  facing, the sun→moon→neutral handoff at the refracted horizon
+- moon intensity follows the lunar phase law (allen), fourth-root compressed:
+  full 1.0, half ~0.55, crescent ~0.44. not a linear ramp in the lit fraction
+- opt-in `tint`: `--rs-tint` r g b triplet, cool blue-gray under the moon
+  (perceptual, purkinje shift), neutral black otherwise
+- css custom-property applier with visibility pause, wake refresh, and a
+  clean `stop()`; `data-sky` / `data-sun` attributes for theming
+- `shadowBearing()`: the sundial. aim the device top at the bearing and
+  on-screen shadows run parallel to real ones (round trip < 0.01°)
