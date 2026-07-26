@@ -169,8 +169,9 @@ starts the loop, writes the variables, returns a handle.
 | `now` | live clock | a fixed `Date`, or a `() => Date`, for demos and time scrubbers. |
 | `onUpdate` | none | called with each written `ShadowVector`. |
 | `moon` | `true` | let the moon cast at night; `false` goes straight to the neutral shadow. |
-| `minLength`, `maxLength` | `3.45`, `10.35` | offset in px at zenith and at the horizon. |
+| `minLength`, `maxLength` | `3.8`, `11.4` | offset in px at zenith and at the horizon. |
 | `facing` | `'auto'` | which horizon the viewer faces; see below. |
+| `tint` | `false` | also write `--rs-tint`, an `r g b` triplet: neutral black under the sun, cool blue-gray under the moon. moonlight is physically a touch redder than sunlight, but night vision is rod-driven and blue-biased (the purkinje shift), so moonlit scenes read cold. use it as `box-shadow: ... rgb(var(--rs-tint) / var(--rs-alpha))`. |
 
 the handle: `refresh()` recomputes now, `setLocation(lat, lon)` moves,
 `current()` returns the last vector, `stop()` clears everything it wrote.
@@ -289,10 +290,12 @@ three steps, all local arithmetic:
    the horizon, where real shadows genuinely diffuse (blur ≤ 2px).
 
 3. **the handoff.** when the sun drops below −0.833° (the refracted horizon:
-   sunset as your eyes define it), the moon takes over if it's up, at 45 to
-   100% strength by its illuminated fraction, times a 0.7 stylisation factor.
-   real moonlight is five orders of magnitude fainter than sunlight; rendering
-   that honestly would render nothing.
+   sunset as your eyes define it), the moon takes over if it's up. its strength
+   follows the real lunar phase law (a half moon is 9% as bright as full, not
+   50: rough terrain shadows itself at every angle except opposition),
+   compressed with a fourth root so partial phases stay visible, times a 0.7
+   stylisation factor. real moonlight is five orders of magnitude fainter than
+   sunlight; rendering that honestly would render nothing.
 
 ## what it is not
 

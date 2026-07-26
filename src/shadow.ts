@@ -24,9 +24,9 @@ export type ShadowSource = 'sun' | 'moon' | 'none' | 'default';
 export type Facing = 'auto' | 'south' | 'north';
 
 export interface ShadowOptions {
-  /** Offset in px when the light is directly overhead. Default 3.45. */
+  /** Offset in px when the light is directly overhead. Default 3.8. */
   minLength?: number;
-  /** Offset in px when the light is on the horizon. Default 10.35. */
+  /** Offset in px when the light is on the horizon. Default 11.4. */
   maxLength?: number;
   /**
    * Curve of length against altitude. Default 1.45, which leans the stretch
@@ -51,6 +51,16 @@ export interface ShadowOptions {
   moonIntensity?: number;
   /** Which horizon the viewer faces. Default `auto`. */
   facing?: Facing;
+  /**
+   * Tint the shadow by its light source. Default false (neutral black).
+   *
+   * When on, `tint` in the result (and `--rs-tint` from the applier) is an
+   * `R G B` triplet: neutral near-black under the sun, a cool blue-gray under
+   * the moon. Moonlight is physically slightly redder than sunlight, but
+   * human night vision is rod-driven and blue-biased (the Purkinje shift),
+   * so moonlit scenes read cold; the tint follows perception.
+   */
+  tint?: boolean;
 }
 
 /** A resolved shadow: where it falls, how dark it is, and what is casting it. */
@@ -73,11 +83,13 @@ export interface ShadowVector {
   sunAltitude: number;
   /** Relative brightness of the source, 0 to 1. The sun is always 1. */
   intensity: number;
+  /** Shadow colour as an `R G B` triplet. `0 0 0` unless `tint` is on. */
+  tint: string;
 }
 
 const DEFAULTS = {
-  minLength: 3.45,
-  maxLength: 10.35,
+  minLength: 3.8,
+  maxLength: 11.4,
   falloff: 1.45,
   minAlpha: 0.17,
   maxAlpha: 1,
@@ -85,7 +97,12 @@ const DEFAULTS = {
   moon: true,
   moonIntensity: 0.7,
   facing: 'auto' as Facing,
+  tint: false,
 };
+
+/** Cool blue-gray for moonlit shadows; see the `tint` option. */
+const MOON_TINT = '26 34 54';
+const NEUTRAL_TINT = '0 0 0';
 
 const D2R = Math.PI / 180;
 const sind = (d: number): number => Math.sin(d * D2R);
@@ -162,8 +179,7 @@ export function shadowVector(
       source = 'moon';
       altitude = moon.altitude;
       azimuth = moon.azimuth;
-      // a thin crescent throws far less light than a full disc
-      intensity = o.moonIntensity * (0.45 + 0.55 * moonIllumination(when).fraction);
+      intensity = o.moonIntensity * moonBrightness(moonIllumination(when).fraction);
     } else {
       return nothingUp(o, sunAltitude);
     }
@@ -202,7 +218,32 @@ export function shadowVector(
     azimuth: round2(azimuth),
     sunAltitude: round2(sunAltitude),
     intensity: round2(intensity),
+    tint: o.tint && source === 'moon' ? MOON_TINT : NEUTRAL_TINT,
   };
+}
+
+/**
+ * The moon's shadow-casting strength for a given illuminated fraction,
+ * on a 0 to 1 scale where 1 is a full moon.
+ *
+ * A linear ramp in the lit fraction is the obvious model and it is wrong:
+ * real moonlight follows the lunar phase law (Allen's astrophysical
+ * quantities), m = 0.026·|a| + 4e-9·a^4 magnitudes for phase angle a, which
+ * makes a half moon 9 percent as bright as full, not 50. The rough terrain
+ * shadows itself at every angle except straight-on opposition.
+ *
+ * Rendering that curve literally would make every non-full moon invisible,
+ * so the physical brightness is compressed with a fourth root into a usable
+ * display range. The ordering and the spacing stay physical: full 1.0,
+ * gibbous ~0.8, half ~0.55, crescent ~0.3.
+ */
+function moonBrightness(litFraction: number): number {
+  const f = clamp(litFraction, 0, 1);
+  // recover the phase angle from the lit fraction: f = (1 + cos a) / 2
+  const a = (Math.acos(2 * f - 1) / Math.PI) * 180;
+  const magnitudeDrop = 0.026 * a + 4e-9 * Math.pow(a, 4);
+  const physical = Math.pow(10, -0.4 * magnitudeDrop);
+  return Math.pow(physical, 0.25);
 }
 
 /** Nothing above the horizon: a short, faint, neutral shadow. */
@@ -217,6 +258,7 @@ function nothingUp(o: typeof DEFAULTS, sunAltitude: number): ShadowVector {
     azimuth: null,
     sunAltitude: round2(sunAltitude),
     intensity: 0,
+    tint: NEUTRAL_TINT,
   };
 }
 
@@ -234,6 +276,7 @@ function defaultVector(o: typeof DEFAULTS): ShadowVector {
     azimuth: null,
     sunAltitude: 0,
     intensity: 1,
+    tint: NEUTRAL_TINT,
   };
 }
 

@@ -50,7 +50,9 @@
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: 14px;
     line-height: 1.5;
-    transition: background 0.6s, color 0.6s;
+    /* deliberately no background/color transition: the sweep is the only
+       mechanism that changes the theme. a css fade here would run underneath
+       the snapshot and you would reveal a half-faded page. */
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -71,7 +73,7 @@
     padding: 1rem 1.25rem;
     margin-bottom: 1.5rem;
     box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgba(0, 0, 0, var(--rs-alpha));
-    transition: box-shadow 0.3s linear, background 0.6s;
+    transition: box-shadow 0.3s linear;
   }
 
   .grid {
@@ -115,9 +117,13 @@
      shows through. clipping the OLD bitmap (rather than the new) is what makes
      it render in webkit. the front is one rounded point with the sides
      trailing, like a string dragged through water.
-     shortened to 520ms here: the time slider can cross dawn in a flick, and
+     shortened to 460ms here: the time slider can cross dawn in a flick, and
      the site's ~1.15s would queue up behind itself. */
   ::view-transition { pointer-events: none; }
+
+  /* while the sweep runs, nothing else may animate: any tween underneath
+     would be revealed mid-flight as the hole opens */
+  html[data-theme-dir] * { transition: none !important; }
 
   html[data-theme-dir]::view-transition-new(root) { animation: none; }
 
@@ -127,11 +133,11 @@
   }
 
   html[data-theme-dir="light"]::view-transition-old(root) {
-    animation: theme-rise-hole-a var(--sweep-ms, 520ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
+    animation: theme-rise-hole-a var(--sweep-ms, 460ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
   }
 
   html[data-theme-dir="dark"]::view-transition-old(root) {
-    animation: theme-descend-hole-a var(--sweep-ms, 520ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
+    animation: theme-descend-hole-a var(--sweep-ms, 460ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -302,16 +308,15 @@
   <h1>real-shadows</h1>
   <p class="sub">shadows that follow the real sun. drag the day.
     <a href="https://github.com/zaydiscold/real-shadows">github</a> ·
-    <a href="https://www.npmjs.com/package/real-shadows">npm</a></p>
+    <a href="https://www.npmjs.com/package/real-shadows">npm</a> ·
+    <a href="https://zayd.wtf">zayd.wtf</a></p>
 
   <section class="card" id="controls">
     <div class="row">
       <label for="place" style="margin:0">place</label>
       <select id="place"></select>
       <button id="live" title="follow the actual clock">live</button>
-      <label class="check" for="wooshy" title="animated light/dark">
-        <input type="checkbox" id="wooshy" checked> wooshy
-      </label>
+      <button id="roll" title="random place and time. cross sunrise or sunset and the page sweeps">random</button>
     </div>
     <label for="time">time of day <span id="clock"></span></label>
     <input id="time" type="range" min="0" max="1439" step="1" value="720">
@@ -335,7 +340,9 @@
     <code>box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgba(0,0,0,var(--rs-alpha))</code>.
     the library computes where the sun, or at night the moon, actually is for the
     chosen place and time, and writes those four variables. the page tint follows
-    <code>data-sky</code>.
+    <code>data-sky</code>. hit <b>random</b> for a new place and hour; if it lands on
+    the other side of sunrise or sunset, the page turns over with the sweep from
+    <a href="https://zayd.wtf">zayd.wtf</a>.
   </p>
 </main>
 
@@ -369,7 +376,7 @@
   }
 
   const $ = (id) => document.getElementById(id);
-  const placeSel = $('place'), timeEl = $('time'), doyEl = $('doy'), wooshyEl = $('wooshy');
+  const placeSel = $('place'), timeEl = $('time'), doyEl = $('doy'), rollEl = $('roll');
 
   for (const name of Object.keys(PLACES)) {
     const o = document.createElement('option');
@@ -416,7 +423,7 @@
     const next = skyPhase(when, lat, lon).sky;
     const flips = prev !== null && isDark(next) !== isDark(prev);
 
-    if (!flips || !wooshyEl.checked || sweeping ||
+    if (!flips || sweeping ||
         reduced.matches || !document.startViewTransition) {
       commit();
       return;
@@ -461,6 +468,20 @@
   timeEl.addEventListener('input', () => { live = false; apply(); });
   doyEl.addEventListener('input', () => { live = false; apply(); });
   $('live').addEventListener('click', () => { live = true; apply(); });
+
+  const pick = (n) => Math.floor(Math.random() * n);
+  rollEl.addEventListener('click', () => {
+    const names = Object.keys(PLACES);
+    // never roll the same place twice running: a roll that appears to do
+    // nothing reads as a broken button
+    let next = placeSel.value;
+    while (names.length > 1 && next === placeSel.value) next = names[pick(names.length)];
+    placeSel.value = next;
+    timeEl.value = pick(1440);
+    doyEl.value = pick(365);
+    live = false;
+    apply();
+  });
 
   apply();
 </script>

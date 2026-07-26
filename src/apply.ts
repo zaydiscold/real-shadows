@@ -69,6 +69,7 @@ function nullVector(): ShadowVector {
     azimuth: null,
     sunAltitude: 0,
     intensity: 0,
+    tint: '0 0 0',
   };
 }
 
@@ -129,6 +130,7 @@ export function realShadows(options: RealShadowsOptions): RealShadowsHandle {
     style.setProperty(varName('y'), `${v.dy}px`);
     style.setProperty(varName('blur'), `${v.blur}px`);
     style.setProperty(varName('alpha'), String(v.alpha));
+    style.setProperty(varName('tint'), v.tint);
 
     if (attributes) {
       const phase = skyPhase(when, lat, lon);
@@ -173,7 +175,7 @@ export function realShadows(options: RealShadowsOptions): RealShadowsHandle {
       if (timer !== null) clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
 
-      for (const suffix of ['x', 'y', 'blur', 'alpha']) {
+      for (const suffix of ['x', 'y', 'blur', 'alpha', 'tint']) {
         element.style.removeProperty(varName(suffix));
       }
       if (attributes) {

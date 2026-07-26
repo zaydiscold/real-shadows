@@ -3,7 +3,14 @@
  * behaviour, clamps, and the fallbacks for bad input.
  */
 import { describe, expect, it } from 'vitest';
-import { shadowVector, skyPhase, sunPosition, moonPosition, compassLabel } from '../src/index.js';
+import {
+  shadowVector,
+  skyPhase,
+  sunPosition,
+  moonPosition,
+  moonIllumination,
+  compassLabel,
+} from '../src/index.js';
 
 const SF = { lat: 37.77, lon: -122.42 };
 const SYDNEY = { lat: -33.87, lon: 151.21 };
@@ -147,6 +154,35 @@ describe('the day-night handoff', () => {
         }
       }
     }
+  });
+
+  it('moon intensity follows the phase law, not the lit fraction', () => {
+    // sweep a synodic month and bucket moonlit intensities by illumination
+    const byPhase: { frac: number; intensity: number }[] = [];
+    for (let d = 0; d < 30; d++) {
+      for (let h = 0; h < 24; h++) {
+        const when = new Date(Date.UTC(2026, 6, 1 + d, h));
+        const v = shadowVector(when, SF.lat, SF.lon);
+        if (v.source === 'moon') {
+          byPhase.push({ frac: moonIllumination(when).fraction, intensity: v.intensity });
+        }
+      }
+    }
+    const near = (target: number) =>
+      byPhase.filter((p) => Math.abs(p.frac - target) < 0.06).map((p) => p.intensity);
+    const full = near(1)[0];
+    const half = near(0.5)[0];
+    const crescent = near(0.15)[0];
+    expect(full).toBeDefined();
+    expect(half).toBeDefined();
+    expect(crescent).toBeDefined();
+    // ordering is physical, and the spacing is the phase law's, not linear:
+    // a half moon under the old linear ramp sat at ~0.86 of full; under the
+    // phase law it must fall near half of full
+    expect(full!).toBeGreaterThan(half!);
+    expect(half!).toBeGreaterThan(crescent!);
+    expect(half! / full!).toBeLessThan(0.65);
+    expect(half! / full!).toBeGreaterThan(0.4);
   });
 });
 
