@@ -1,8 +1,17 @@
 name: release
 
-# publish to npm with provenance when a version tag is pushed:
-#   git tag v1.0.0 && git push --tags
-# requires an npm automation token in the NPM_TOKEN repo secret.
+# publishes to npm when a version tag is pushed:
+#   npm version patch|minor|major   (bumps package.json, commits, tags)
+#   git push --follow-tags
+#
+# auth is OIDC trusted publishing, so there is no NPM_TOKEN secret to leak or
+# rotate: github mints a short-lived identity token, npm verifies it came from
+# this repo and this workflow file, and provenance is attested automatically.
+#
+# one-time setup on npmjs.com, only possible once a version exists (which is
+# why 1.0.0 went out by hand):
+#   npmjs.com/package/real-shadows/access -> trusted publisher
+#   organization zaydiscold / repository real-shadows / workflow release.yml
 
 on:
   push:
@@ -10,7 +19,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # required: lets the runner mint the OIDC token
 
 jobs:
   publish:
@@ -22,10 +31,16 @@ jobs:
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
+
+      # trusted publishing needs npm 11.5.1+; node 22 still ships npm 10
+      - run: npm install -g npm@latest
+
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npx publint@0.3
+      - run: npx @arethetypeswrong/cli@0.18 --pack .
+
+      # no NODE_AUTH_TOKEN: the OIDC identity is the credential
+      - run: npm publish --access public
