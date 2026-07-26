@@ -18,6 +18,16 @@
 </p>
 
 <br>
+
+<p align="center">
+  <a href="https://zaydiscold.github.io/real-shadows/">
+    <img src="./assets/demo.gif" alt="a day over san francisco: the shadows under four cards swing right, shorten to nothing at noon, stretch left through the afternoon, then fade as the moon takes over" width="760" />
+  </a>
+</p>
+
+<p align="center"><sub>one day over san francisco. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a></sub></p>
+
+<br>
 <br>
 
 <p align="center">
@@ -96,6 +106,28 @@ theming hooks, if you want them:
 [data-sky='golden'] body { background: #f2e9d8; }   /* golden hour tint */
 [data-sun='down'] body   { background: #17171c; }   /* dark when the sun is actually down */
 ```
+
+### a shadow scale
+
+the library writes one offset, the shadow cast by something sitting on the page.
+design systems usually want a scale, and a scale falls out of multiplying it: a
+thing twice as far off the page throws a shadow twice as long. `calc()` does the
+whole job, no extra api.
+
+```css
+:root {
+  --sm: 0.6;  /* resting on the surface */
+  --md: 1;    /* the library's own offset */
+  --lg: 2.2;  /* lifted, a modal or a drag */
+}
+.card   { box-shadow: calc(var(--rs-x) * var(--sm)) calc(var(--rs-y) * var(--sm))
+                      var(--rs-blur) rgb(0 0 0 / var(--rs-alpha)); }
+.dialog { box-shadow: calc(var(--rs-x) * var(--lg)) calc(var(--rs-y) * var(--lg))
+                      calc(var(--rs-blur) * var(--lg)) rgb(0 0 0 / var(--rs-alpha)); }
+```
+
+every tier stays on the same sun, so the whole page reads as one light source at
+one moment. that is the part a static shadow scale cannot do.
 
 the library never asks for a location. you pass one in; the three usual sources:
 

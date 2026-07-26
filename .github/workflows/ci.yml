@@ -8,16 +8,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # the library targets es2020 and runs anywhere; this floor is the
-        # dev toolchain's (vitest 4 needs node 20+)
-        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          # the shipped code is es2020 and uses no node apis, so running the
+          # same pure math on three node versions proved nothing. one lts run.
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -25,3 +22,7 @@ jobs:
         # astronomy-engine on every run
       - run: npm test
       - run: npm run build
+        # publint checks the published shape (exports, types, file paths);
+        # attw checks that every module resolution mode gets real types
+      - run: npx publint@0.3
+      - run: npx @arethetypeswrong/cli@0.18 --pack .

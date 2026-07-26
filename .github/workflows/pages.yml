@@ -30,6 +30,8 @@ jobs:
       - run: npm run build
         # the demo imports ./real-shadows.js; ship it the fresh esm build
       - run: cp dist/index.js demo/real-shadows.js
+        # the social card lives in assets/ and is served from the page root
+      - run: cp assets/og.png demo/og.png
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
