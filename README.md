@@ -69,10 +69,12 @@ flips at actual sunset) one css selector.
 ## install
 
 ```bash
-npm install real-shadows
+npm i real-shadows
 ```
 
-or from a script tag, no build step (pin a version in production):
+pnpm, yarn, and bun work the same way (`pnpm add`, `yarn add`, `bun add`).
+
+or skip the install entirely, straight from a cdn, no build step:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/real-shadows@1"></script>
@@ -80,6 +82,31 @@ or from a script tag, no build step (pin a version in production):
   RealShadows.realShadows({ lat: 37.77, lon: -122.42 });
 </script>
 ```
+
+`@1` pins the major version, so you get fixes but never a breaking change.
+
+want to see the numbers before installing anything? `npx` runs a package's
+command without installing it, so this prints the shadow being cast over a
+location right now:
+
+```bash
+npx real-shadows 37.77 -122.42
+```
+
+```
+casting  sun
+sky      day (sun 39.1deg, up)
+caster   alt 39.1deg, az 264.7deg
+offset   -7.09px, 5.55px
+opacity  0.69
+tint     rgb(0 0 0)
+sundial  aim device top 213deg (ssw)
+
+css:  box-shadow: -7.09px 5.55px 0px rgb(0 0 0 / 0.69);
+```
+
+`--at <iso-date>` checks another moment, `--json` gives machine-readable output.
+run it after dark and `casting` flips to `moon`, with a cooler tint.
 
 ## quickstart
 

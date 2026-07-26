@@ -1,5 +1,11 @@
 # changelog
 
+## 1.1.0
+
+- `npx real-shadows <lat> <lon>` prints the shadow being cast over a location
+  right now, with `--at` for another moment and `--json` for scripts. lets you
+  check the numbers, and watch the sun/moon handoff, without wiring up a page
+
 ## 1.0.0
 
 initial release.
