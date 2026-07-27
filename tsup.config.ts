@@ -7,6 +7,12 @@ export default defineConfig([
     dts: true,
     clean: true,
     treeshake: true,
+    // Two entries that share code make tsup split the common part into a
+    // chunk, leaving dist/index.js as a bare re-export. That breaks any
+    // consumer copying index.js on its own, which is exactly how the demo
+    // page loads it: the chunk 404s and the module never evaluates.
+    // Each entry carries its own copy instead; the duplication is ~3 kB.
+    splitting: false,
     target: 'es2020',
     outExtension: ({ format }) => ({ js: format === 'cjs' ? '.cjs' : '.js' }),
   },
