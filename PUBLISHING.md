@@ -29,21 +29,39 @@ npm publish        # prompts for the otp
 
 ## after 1.0.0: wire up trusted publishing, once
 
-on npmjs.com, at **npmjs.com/package/real-shadows/access**, under
-*trusted publisher*:
+this is the step that ends the otp prompts for good. **do it from a real
+terminal**, not from an agent or a script: the auth link it prints expires in a
+couple of minutes, so it has to be approved while you are sitting there.
 
-| field | value |
-|---|---|
-| publisher | github actions |
-| organization or user | `zaydiscold` |
-| repository | `real-shadows` |
-| workflow filename | `release.yml` |
-| environment | leave blank |
+```bash
+npm trust github real-shadows \
+  --file release.yml \
+  --repo zaydiscold/real-shadows \
+  --allow-publish
+```
 
-that tells npm to accept a publish that proves, cryptographically, that it came
-from this repository running this workflow file. no token is created, so there
-is no token to leak, rotate, or forget. provenance attestation is automatic, and
-npm shows the verified badge on the package page.
+needs npm 11.5.1 or later (`npm -v`). if the global npm is older and
+`npm install -g npm@latest` fails on a file conflict, run it out of a throwaway
+install instead:
+
+```bash
+mkdir -p /tmp/npm11 && cd /tmp/npm11 && npm i npm@latest
+node /tmp/npm11/node_modules/npm/bin/npm-cli.js trust github real-shadows \
+  --file release.yml --repo zaydiscold/real-shadows --allow-publish
+```
+
+it prints `Authenticate your account at: https://www.npmjs.com/auth/cli/<id>`.
+open it, approve with the security key, and the command finishes on its own.
+`npm trust list real-shadows` confirms it afterwards.
+
+> the same thing can be done in the web ui at
+> **npmjs.com/package/real-shadows/access** under *trusted publisher*:
+> github actions / `zaydiscold` / `real-shadows` / `release.yml`, environment blank.
+
+either way npm will then accept a publish that proves, cryptographically, that
+it came from this repository running this workflow file. no token is created, so
+there is nothing to leak, rotate, or forget. provenance attestation is
+automatic, and npm shows the verified badge on the package page.
 
 ## every release after that
 
