@@ -23,6 +23,7 @@
 <style>
   :root {
     --paper: #f4f1ea;
+    --card: var(--paper);
     --ink: #1a1a1a;
     --accent: #ff8040;
     --line: 1px solid var(--ink);
@@ -34,6 +35,8 @@
   }
   [data-sky="night"], [data-sky="dusk"] {
     --paper: #17171c;
+    --card: #1f1f27; /* cards sit a step above the page: a black shadow needs
+                        a surface lighter than itself to read against */
     --ink: #e8e6e1;
     --accent: #9b7dff;
   }
@@ -69,7 +72,7 @@
   /* every card carries the sun-driven shadow */
   .card {
     border: var(--line);
-    background: var(--paper);
+    background: var(--card, var(--paper));
     padding: 1rem 1.25rem;
     margin-bottom: 1.5rem;
     box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgba(0, 0, 0, var(--rs-alpha));
@@ -117,8 +120,8 @@
      shows through. clipping the OLD bitmap (rather than the new) is what makes
      it render in webkit. the front is one rounded point with the sides
      trailing, like a string dragged through water.
-     shortened to 460ms here: the time slider can cross dawn in a flick, and
-     the site's ~1.15s would queue up behind itself. */
+     full 1150ms, the site's own pace: the sweep only fires from the random
+     button now, so a slider drag can never queue transitions behind itself. */
   ::view-transition { pointer-events: none; }
 
   /* while the sweep runs, nothing else may animate: any tween underneath
@@ -133,11 +136,11 @@
   }
 
   html[data-theme-dir="light"]::view-transition-old(root) {
-    animation: theme-rise-hole-a var(--sweep-ms, 460ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
+    animation: theme-rise-hole-a var(--sweep-ms, 1150ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
   }
 
   html[data-theme-dir="dark"]::view-transition-old(root) {
-    animation: theme-descend-hole-a var(--sweep-ms, 460ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
+    animation: theme-descend-hole-a var(--sweep-ms, 1150ms) cubic-bezier(0.3, 0.5, 0.22, 1) both;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -404,6 +407,10 @@
   const isDark = (sky) => sky === 'night' || sky === 'dusk';
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   let sweeping = false;
+  // the sweep belongs to the random button alone. sliders change the sky too,
+  // but scrubbing is exploration, not an event, and a drag across dawn firing
+  // a full-page transition felt broken. roll() sets this for one apply().
+  let viaRandom = false;
 
   function apply() {
     const [lat, lon] = PLACES[placeSel.value];
@@ -422,8 +429,10 @@
     const prev = document.documentElement.getAttribute('data-sky');
     const next = skyPhase(when, lat, lon).sky;
     const flips = prev !== null && isDark(next) !== isDark(prev);
+    const wantSweep = viaRandom;
+    viaRandom = false;
 
-    if (!flips || sweeping ||
+    if (!flips || !wantSweep || sweeping ||
         reduced.matches || !document.startViewTransition) {
       commit();
       return;
@@ -480,6 +489,7 @@
     timeEl.value = pick(1440);
     doyEl.value = pick(365);
     live = false;
+    viaRandom = true;
     apply();
   });
 
