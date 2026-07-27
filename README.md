@@ -94,19 +94,44 @@ npx real-shadows 37.77 -122.42
 ```
 
 ```
+when     2026-07-27T19:39:03.867Z
+where    37.77, -122.42
 casting  sun
-sky      day (sun 39.1deg, up)
-caster   alt 39.1deg, az 264.7deg
-offset   -7.09px, 5.55px
-opacity  0.69
+sky      day (sun 69.6deg, up)
+caster   alt 69.6deg, az 154.0deg
+offset   2.05px, 4.51px
+blur     0px
+opacity  0.95
 tint     rgb(0 0 0)
-sundial  aim device top 213deg (ssw)
+moon     97% lit, waxing
+sundial  aim device top 178deg (s)
 
-css:  box-shadow: -7.09px 5.55px 0px rgb(0 0 0 / 0.69);
+css:  box-shadow: 2.05px 4.51px 0px rgb(0 0 0 / 0.95);
 ```
 
-`--at <iso-date>` checks another moment, `--json` gives machine-readable output.
-run it after dark and `casting` flips to `moon`, with a cooler tint.
+real output, midday over san francisco: the sun nearly overhead at 69.6 degrees,
+so the shadow is short and falls almost straight down.
+
+`--at <iso-date>` asks about another moment. ten hours later, after dark:
+
+```bash
+npx real-shadows 37.77 -122.42 --at 2026-07-28T05:30:00Z
+```
+
+```
+casting  moon
+sky      night (sun -21.1deg, down)
+caster   alt 21.5deg, az 154.7deg
+offset   3.82px, 5.53px
+blur     1px
+opacity  0.3
+moon     98% lit, waxing
+sundial  aim device top 189deg (s)
+```
+
+the caster hands off to the moon on its own. opacity drops from 0.95 to 0.3, and
+the edge picks up a 1px blur because the moon is low. `--json` gives the same
+thing machine-readable.
 
 ## quickstart
 
