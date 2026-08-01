@@ -1,18 +1,17 @@
 /**
- * The sundial property: the bearing is a constant of the model, not of the
- * moment. The model draws for a viewer facing the equator, so the device's
- * top edge goes due south in the northern hemisphere and due north in the
- * southern, and it never moves. Held there, the on-screen east-west lean must
- * genuinely match the real shadow's east-west lean at every hour: with the
- * top at bearing B the screen vector (dx, dy) lands on compass east component
- * dx·cos(B·D2R)... concretely, top-south flips dx into east = -dx, top-north
- * keeps east = dx, and that must carry the same sign as the true shadow's
- * east component, sin((azimuth + 180)°).
+ * The sundial property: for any moment and place where something is casting,
+ * pointing the device's top edge at the returned bearing must line the
+ * on-screen shadow up with the real one.
+ *
+ * The check is a round trip. The real shadow falls at azimuth + 180. If the
+ * device top faces `degrees`, a screen vector at angle theta clockwise from
+ * screen-top points at compass bearing degrees + theta. So
+ * degrees + atan2(dx, -dy) must land back on azimuth + 180, exactly.
  */
 import { describe, expect, it } from 'vitest';
 import { shadowBearing, shadowVector } from '../src/index.js';
 
-const D2R = Math.PI / 180;
+const R2D = 180 / Math.PI;
 
 // a deterministic pseudo-random walk over the globe and the calendar
 function mulberry32(seed: number): () => number {
@@ -27,44 +26,7 @@ function mulberry32(seed: number): () => number {
 }
 
 describe('shadowBearing', () => {
-  it('never changes with time: due south all year in the north', () => {
-    let checked = 0;
-    for (let d = 0; d < 365; d += 7) {
-      for (let h = 0; h < 24; h += 3) {
-        const date = new Date(Date.UTC(2026, 0, 1 + d, h));
-        const bearing = shadowBearing(date, 37.77, -122.42); // san francisco
-        if (!bearing) continue; // nothing up — nothing to align
-        expect(bearing.degrees, date.toISOString()).toBe(180);
-        expect(bearing.direction).toBe('s');
-        checked++;
-      }
-    }
-    expect(checked).toBeGreaterThan(200);
-  });
-
-  it('never changes with time: due north all year in the south', () => {
-    let checked = 0;
-    for (let d = 0; d < 365; d += 7) {
-      for (let h = 0; h < 24; h += 3) {
-        const date = new Date(Date.UTC(2026, 0, 1 + d, h));
-        const bearing = shadowBearing(date, -33.87, 151.21); // sydney
-        if (!bearing) continue;
-        expect(bearing.degrees, date.toISOString()).toBe(0);
-        expect(bearing.direction).toBe('n');
-        checked++;
-      }
-    }
-    expect(checked).toBeGreaterThan(200);
-  });
-
-  it('follows an explicit facing override', () => {
-    const noon = new Date(Date.UTC(2026, 5, 21, 20)); // midday over sf
-    expect(shadowBearing(noon, 37.77, -122.42, { facing: 'north' })?.degrees).toBe(0);
-    const sydneyNoon = new Date(Date.UTC(2026, 5, 21, 2));
-    expect(shadowBearing(sydneyNoon, -33.87, 151.21, { facing: 'south' })?.degrees).toBe(180);
-  });
-
-  it('matches the real shadow lean under the fixed bearing, everywhere', () => {
+  it('closes the round trip within a hundredth of a degree, everywhere', () => {
     const rand = mulberry32(20260722);
     let checked = 0;
 
@@ -79,18 +41,14 @@ describe('shadowBearing', () => {
       if (!bearing) continue; // nothing up — nothing to align
 
       const v = shadowVector(date, lat, lon);
-      // real shadow's east component: it points opposite the caster
-      const realEast = Math.sin(((v.azimuth as number) + 180) * D2R);
-      if (Math.abs(realEast) < 1e-3) continue; // caster on the meridian, no lean
+      const screenAngle = Math.atan2(v.dx, -v.dy) * R2D;
+      const reconstructed = (((bearing.degrees + screenAngle) % 360) + 360) % 360;
+      const real = (((v.azimuth as number) + 180) % 360 + 360) % 360;
 
-      // the on-screen dx mapped onto the compass, top edge held at the bearing:
-      // top-south makes screen-right west (east = -dx), top-north keeps it east
-      const screenEast = bearing.degrees === 180 ? -v.dx : v.dx;
-
-      expect(
-        Math.sign(screenEast),
-        `${date.toISOString()} @ ${lat.toFixed(2)},${lon.toFixed(2)}`,
-      ).toBe(Math.sign(realEast));
+      const closure = Math.abs((((reconstructed - real + 540) % 360) + 360) % 360 - 180);
+      expect(closure, `${date.toISOString()} @ ${lat.toFixed(2)},${lon.toFixed(2)}`).toBeLessThan(
+        0.01,
+      );
       checked++;
     }
 

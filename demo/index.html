@@ -318,7 +318,7 @@
     <div class="row">
       <label for="place" style="margin:0">place</label>
       <select id="place"></select>
-      <button id="live" title="follow the actual clock">live</button>
+      <button id="live" title="the actual clock, at your rough location (ip guess, falls back to your timezone)">live</button>
       <button id="roll" title="random place and time. cross sunrise or sunset and the page sweeps">random</button>
     </div>
     <label for="time">time of day <span id="clock"></span></label>
@@ -352,7 +352,7 @@
 <script type="module">
   // when developing locally, `npm run demo` serves ../dist; the published
   // page uses the same file copied in by the deploy workflow
-  import { shadowVector, skyPhase, shadowBearing, realShadows }
+  import { shadowVector, skyPhase, shadowBearing, compassLabel, realShadows }
     from './real-shadows.js';
 
   const PLACES = {
@@ -465,6 +465,12 @@
     $('clock').textContent = '· ' + local.toISOString().slice(11, 16);
     $('date').textContent = '· ' + local.toISOString().slice(5, 10);
 
+    // the real-life shadow: which way the shadow under your coffee cup points,
+    // straight opposite the caster. shown beside the sundial so the two moving
+    // numbers explain each other — the sundial is this bearing minus the
+    // on-screen shadow's own angle.
+    const realDeg = v.azimuth === null ? null : (((v.azimuth + 180) % 360) + 360) % 360;
+
     const rows = {
       source: v.source,
       sky: phase.sky,
@@ -472,6 +478,7 @@
       offset: `${v.dx}px, ${v.dy}px`,
       alpha: v.alpha,
       'caster alt/az': v.altitude === null ? '—' : `${v.altitude.toFixed(0)}° / ${v.azimuth.toFixed(0)}°`,
+      'real shadow': realDeg === null ? '—' : `points ${Math.round(realDeg)}° (${compassLabel(realDeg)})`,
       sundial: bearing ? `aim top ${Math.round(bearing.degrees)}° (${bearing.direction})` : '—',
     };
     $('readout').innerHTML = Object.entries(rows)
@@ -482,7 +489,53 @@
   placeSel.addEventListener('change', apply);
   timeEl.addEventListener('input', () => { live = false; apply(); });
   doyEl.addEventListener('input', () => { live = false; apply(); });
-  $('live').addEventListener('click', () => { live = true; apply(); });
+
+  // live means YOUR sky, not a preset city's. a keyless ip lookup gives a
+  // city-level guess (same providers zayd.wtf uses); if the network says no,
+  // the browser's own reported timezone still pins the longitude band, which
+  // is plenty for a shadow. the library itself never does this — location is
+  // bring-your-own — this is just the demo bringing its own.
+  let herePlace = null; // option label once resolved, cached for the tab
+  async function roughLocation() {
+    if (herePlace) return herePlace;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    for (const url of ['https://ipwho.is/', 'https://ipapi.co/json/']) {
+      try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 6000);
+        const j = await (await fetch(url, { cache: 'no-store', signal: ctrl.signal })).json();
+        clearTimeout(to);
+        const lat = Number(j.latitude ?? j.lat);
+        const lon = Number(j.longitude ?? j.lon);
+        if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90) {
+          const tz = (j.timezone && typeof j.timezone === 'object' ? j.timezone.id : j.timezone) || zone;
+          herePlace = `near ${String(j.city || 'you').toLowerCase()} (ip guess)`;
+          PLACES[herePlace] = [lat, lon, tz];
+          return herePlace;
+        }
+      } catch { /* provider down or blocked; try the next, then the timezone */ }
+    }
+    // the reported timezone alone: its utc offset fixes the longitude to
+    // within the zone's width. latitude is a shrug at the mid-latitudes —
+    // that costs shadow length, and hemisphere decides the lean's sign, so
+    // the obviously-southern zone prefixes flip south
+    const south = /^(Australia|Antarctica)\//.test(zone);
+    herePlace = `your timezone (${zone.split('/').pop().toLowerCase().replace(/_/g, ' ')})`;
+    PLACES[herePlace] = [south ? -25 : 20, utcOffsetHours(zone, new Date()) * 15, zone];
+    return herePlace;
+  }
+
+  $('live').addEventListener('click', async () => {
+    live = true;
+    const name = await roughLocation();
+    if (![...placeSel.options].some((o) => o.textContent === name)) {
+      const o = document.createElement('option');
+      o.textContent = name;
+      placeSel.appendChild(o);
+    }
+    placeSel.value = name;
+    apply();
+  });
 
   const pick = (n) => Math.floor(Math.random() * n);
   rollEl.addEventListener('click', () => {

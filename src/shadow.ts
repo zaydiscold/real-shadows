@@ -322,7 +322,7 @@ export function skyPhase(date: Date, lat: number, lon: number): SkyState {
 
 /** A compass bearing, in degrees and as a sixteen-point label. */
 export interface Bearing {
-  /** Degrees clockwise from true north: 180 facing south, 0 facing north. */
+  /** Degrees clockwise from true north. Full precision; round for display. */
   degrees: number;
   /** Sixteen-point compass label, such as `ssw`. */
   direction: string;
@@ -345,19 +345,14 @@ export function compassLabel(degrees: number): string {
  * The compass bearing to point a device's top edge so that its on-screen
  * shadows line up with the real shadows around it.
  *
- * This is a constant of the model, not of the moment. The model draws for a
- * viewer facing the equator, so the answer is simply due south (180) in the
- * northern hemisphere and due north (0) in the southern, flipped by `facing`.
- * Lay the device flat with its top edge on that bearing and leave it there:
- * the on-screen lean (`dx` is the light's east-west component exactly) runs
- * the same way as the real shadow beside the device, and the two swing
- * together as the sun or moon crosses the sky. The down-page component is the
- * model's stylisation and never rotates, which is precisely why the bearing
- * never has to move to keep the lean matched.
+ * The screen shadow only carries the light's east-west lean, since it always
+ * falls down the page. This works out the rotation that reconciles that
+ * flattened vector with the true shadow bearing, which is simply opposite the
+ * light. Point the top of the phone at the returned bearing and the shadow
+ * under a card on screen runs parallel to the shadow under the phone.
  *
  * Returns null when nothing is above the horizon to cast, or when the
- * coordinates are unusable. `source` says which body the alignment is
- * against.
+ * coordinates are unusable.
  */
 export function shadowBearing(
   date: Date,
@@ -368,6 +363,11 @@ export function shadowBearing(
   const v = shadowVector(date, lat, lon, options);
   if ((v.source !== 'sun' && v.source !== 'moon') || v.azimuth === null) return null;
 
-  const degrees = facingSign(resolve(options).facing, lat) === 1 ? 180 : 0;
+  // a shadow points away from whatever is casting it
+  const realBearing = v.azimuth + 180;
+  // the on-screen shadow's angle, measured clockwise from the top of the screen
+  const screenAngle = Math.atan2(v.dx, -v.dy) / D2R;
+
+  const degrees = (((realBearing - screenAngle) % 360) + 360) % 360;
   return { degrees, direction: compassLabel(degrees), source: v.source };
 }
