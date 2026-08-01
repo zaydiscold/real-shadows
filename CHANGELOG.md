@@ -1,5 +1,12 @@
 # changelog
 
+## 1.1.1
+
+- cli: reject unknown flags instead of silently running with "now". a typo
+  like `--date` (for `--at`) used to be ignored and print the current moment
+  with exit 0; it now fails with the usage text
+- fresh readme gif and social card, re-recorded from the current demo ui
+
 ## 1.1.0
 
 - `npx real-shadows <lat> <lon>` prints the shadow being cast over a location

@@ -42,4 +42,9 @@ describe.skipIf(!existsSync(CLI))('cli', () => {
     expect(() => run(['abc', '12'])).toThrow();
     expect(() => run(['200', '12'])).toThrow();
   });
+
+  it('rejects a flag it does not know instead of silently running with now', () => {
+    // regression: `--date 2026-01-01` (a typo for --at) used to be ignored
+    expect(() => run(['37.77', '-122.42', '--date', '2026-01-01'])).toThrow();
+  });
 });

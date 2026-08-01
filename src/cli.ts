@@ -30,6 +30,8 @@ if (argv.length === 0 || argv.includes('-h') || argv.includes('--help')) {
 }
 
 const json = argv.includes('--json');
+const unknown = argv.find((a) => a.startsWith('--') && a !== '--json' && a !== '--at' && a !== '--help');
+if (unknown) fail(`unknown flag: ${unknown}`);
 const atIndex = argv.indexOf('--at');
 // guard the -1 case: without --at, `atIndex + 1` is 0 and would eat the latitude.
 // note a bare `-` prefix is legal here, since a west longitude is negative.
