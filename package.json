@@ -1,6 +1,6 @@
 {
   "name": "real-shadows",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "shadows that follow the real sun. computes the sun's (or at night, the moon's) actual position for a location and drives your css shadows to match. zero dependencies.",
   "keywords": [
     "shadow",

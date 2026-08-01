@@ -104,7 +104,7 @@ blur     0px
 opacity  0.95
 tint     rgb(0 0 0)
 moon     97% lit, waxing
-sundial  aim device top 178deg (s)
+sundial  aim device top 180deg (s)
 
 css:  box-shadow: 2.05px 4.51px 0px rgb(0 0 0 / 0.95);
 ```
@@ -126,7 +126,7 @@ offset   3.82px, 5.53px
 blur     1px
 opacity  0.3
 moon     98% lit, waxing
-sundial  aim device top 189deg (s)
+sundial  aim device top 180deg (s)
 ```
 
 the caster hands off to the moon on its own. opacity drops from 0.95 to 0.3, and
@@ -307,13 +307,20 @@ your desk:
 
 ```js
 const b = shadowBearing(new Date(), 37.77, -122.42);
-// { degrees: 149.2, direction: 'sse', source: 'sun' }
+// { degrees: 180, direction: 's', source: 'sun' }
 ```
 
-aim the top of the phone at 149° and the shadow under a card on screen runs
-parallel to the shadow under your coffee cup. the round trip (device bearing
-plus on-screen shadow angle equals the true shadow bearing) closes within a
-hundredth of a degree in the test suite, over 500 random places and moments.
+the bearing is a constant of the model, not of the moment. the shadows are
+drawn for a viewer facing the equator, so the answer is simply due south in
+the northern hemisphere and due north in the southern (`facing` flips it).
+lay the phone flat with its top edge on that bearing and leave it there: the
+lean of the shadow under a card on screen runs the same way as the shadow
+under your coffee cup, at nine in the morning and at six at night, and the
+two swing together as the sun crosses the sky. the test suite holds the
+bearing still across a year of samples in both hemispheres and checks the
+lean genuinely matches over 500 random places and moments. it returns null
+when nothing is up to cast, and `source` says which body you are aligned
+with.
 
 <br>
 <br>

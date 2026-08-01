@@ -418,7 +418,13 @@
 
     const commit = () => {
       handle?.stop();
-      handle = realShadows({ lat, lon, now: when, interval: 6e7 });
+      // live mode hands the applier the real clock and re-renders the readout
+      // on every tick; scrubbed mode freezes the applier at the chosen moment
+      // (the huge interval means it never ticks on its own)
+      handle = live
+        ? realShadows({ lat, lon, interval: 60000,
+            onUpdate: () => render(new Date(), lat, lon) })
+        : realShadows({ lat, lon, now: when, interval: 6e7 });
       render(when, lat, lon);
     };
 

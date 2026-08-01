@@ -1,5 +1,15 @@
 # changelog
 
+## 1.2.0
+
+- the sundial holds still. `shadowBearing()` now returns the model's one
+  fixed alignment — device top due south (180°) in the northern hemisphere,
+  due north (0°) in the southern, flipped by `facing` — instead of a bearing
+  that drifted through the day. the old number chased the stylised down-page
+  component of the on-screen shadow, so it changed as the sun moved; the
+  constant bearing is the point of the sundial: set the phone down once and
+  the on-screen lean tracks the real shadow all day
+
 ## 1.1.0
 
 - `npx real-shadows <lat> <lon>` prints the shadow being cast over a location
