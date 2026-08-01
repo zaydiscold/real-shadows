@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>real-shadows: shadows that follow the real sun</title>
 <meta name="description" content="drag through the day and watch the light move. a zero-dependency library that drives css shadows from the real position of the sun and moon.">
+<!-- the favicon is the library in one glyph: a card throwing its shadow
+     down-right. inline so the page stays a single file with zero requests -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f4f1ea'/%3E%3Crect x='11' y='11' width='14' height='14' fill='%231a1a1a' opacity='.55'/%3E%3Crect x='7' y='7' width='14' height='14' fill='%23f4f1ea' stroke='%231a1a1a' stroke-width='2'/%3E%3C/svg%3E">
 
 <link rel="canonical" href="https://zaydiscold.github.io/real-shadows/">
 <meta property="og:type" content="website">
@@ -528,6 +531,9 @@
   $('live').addEventListener('click', async () => {
     live = true;
     const name = await roughLocation();
+    // the lookup can take seconds; if a slider was dragged meanwhile the
+    // user chose scrubbing over live, and yanking the place now would fight them
+    if (!live) return;
     if (![...placeSel.options].some((o) => o.textContent === name)) {
       const o = document.createElement('option');
       o.textContent = name;
