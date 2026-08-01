@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="#what-it-does">what it does</a> · <a href="#install">install</a> · <a href="#quickstart">quickstart</a> · <a href="#api">api</a> · <a href="#accuracy">accuracy</a> · <a href="#the-sundial">the sundial</a> · <a href="#how-the-math-works">how the math works</a>
+  <a href="#what-it-does">what it does</a> · <a href="#install">install</a> · <a href="#quickstart">quickstart</a> · <a href="#api">api</a> · <a href="#accuracy">accuracy</a> · <a href="#the-sundial">the sundial</a> · <a href="#every-number-one-line">the numbers</a> · <a href="#how-the-math-works">how the math works</a>
 </p>
 
 <br>
@@ -314,6 +314,34 @@ aim the top of the phone at 149° and the shadow under a card on screen runs
 parallel to the shadow under your coffee cup. the round trip (device bearing
 plus on-screen shadow angle equals the true shadow bearing) closes within a
 hundredth of a degree in the test suite, over 500 random places and moments.
+
+the bearing is yours: it depends on where you stand and when you ask, and it
+moves through the day as the sun does. that is not drift, it is the point —
+the on-screen vertical is stylised (always down the page), so the rotation
+that reconciles screen and sky has to change as the light swings. same
+formula, same number, as the sundial on [zayd.wtf](https://zayd.wtf).
+
+## every number, one line
+
+everything the library reports — in the demo readout and in
+`npx real-shadows` — with the line of math that produces it, so any number on
+the screen can be checked by hand:
+
+| number | the line | proven by |
+|---|---|---|
+| caster alt/az | schlyter's classical ephemeris; moon topocentric | oracle in ci vs astronomy-engine: sun < 0.05°, moon < 0.2° |
+| sky | sun altitude bands: ≥ 6° day, ≥ −6° golden, ≥ −12° dusk, else night | handoff tests at fixed dates |
+| length | `min + (max − min) · (1 − alt/90)^1.45` | monotonic-in-altitude unit test |
+| offset x | `±sin(azimuth) · length` — the light's true east-west lean; sign from `facing` | model units, signs checked in the demo |
+| offset y | `(0.4 + 0.6 · sin(alt)) · length` — stylised, always down the page | model units |
+| opacity | `(0.17 + 0.83 · sin(alt)) · intensity`, clamped 0–1 | clamp tests |
+| blur | `round((1 − sin alt)² · 2)` px | bounds test |
+| moon intensity | lunar phase law (allen), fourth-root compressed: full 1.0, half ~0.55 | scaling test |
+| sundial | `(azimuth + 180) − atan2(dx, −dy)`, mod 360 | round trip < 0.01° over 500 random places and moments |
+
+the handoff rule threading them together: sun casts down to −0.833° (the
+refracted horizon), then the moon if it is up, else the neutral fallback
+`(minLength, minLength, minAlpha)`.
 
 <br>
 <br>
