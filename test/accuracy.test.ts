@@ -106,3 +106,48 @@ describe('moon illumination vs astronomy-engine', () => {
     }
   });
 });
+
+describe('moon bright limb against the oracle', () => {
+  it('points the lit edge the way astronomy-engine says the sun is', async () => {
+    const { moonBrightLimb } = await import('../src/index.js');
+    const rad = Math.PI / 180;
+    let worst = 0;
+    let checked = 0;
+    for (const [, lat, lon] of PLACES) {
+      const observer = new A.Observer(lat, lon, 0);
+      for (const date of DATES) {
+        const lit = A.Illumination(A.Body.Moon, date).phase_fraction;
+        if (lit < 0.03 || lit > 0.97) continue; // no terminator to orient
+        // the oracle's own topocentric horizontal positions of both bodies
+        const hor = (body: A.Body) => {
+          const eq = A.Equator(body, date, observer, true, true);
+          return A.Horizon(date, observer, eq.ra, eq.dec);
+        };
+        const m = hor(A.Body.Moon);
+        const s = hor(A.Body.Sun);
+        if (Math.abs(m.altitude) > 85) continue; // "up" is undefined at the zenith
+        // bearing from the moon to the sun on the sky, measured from the
+        // zenith direction: positive toward increasing azimuth, which is to
+        // the right for someone facing the moon
+        const dAz = (s.azimuth - m.azimuth) * rad;
+        const expected =
+          (Math.atan2(
+            Math.cos(s.altitude * rad) * Math.sin(dAz),
+            Math.sin(s.altitude * rad) * Math.cos(m.altitude * rad) -
+              Math.cos(s.altitude * rad) * Math.sin(m.altitude * rad) * Math.cos(dAz),
+          ) /
+            rad +
+            360) %
+          360;
+        const got = moonBrightLimb(date, lat, lon);
+        const err = Math.abs(((got - expected + 540) % 360) - 180);
+        worst = Math.max(worst, err);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(300);
+    // the residual is the moon's parallax, which this function leaves out:
+    // it shifts the moon about a degree, and the limb angle with it
+    expect(worst).toBeLessThan(3);
+  });
+});

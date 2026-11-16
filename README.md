@@ -7,7 +7,7 @@
 <p align="center">shadows that follow the real sun. and at night, the real moon.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/gzip-~4_kB-B4A7D6?style=flat-square&labelColor=1a1a2e" alt="size" />
+  <img src="https://img.shields.io/badge/gzip-~4.5_kB-B4A7D6?style=flat-square&labelColor=1a1a2e" alt="size" />
   <img src="https://img.shields.io/github/actions/workflow/status/zaydiscold/real-shadows/ci.yml?style=flat-square&labelColor=1a1a2e" alt="ci" />
   <img src="https://img.shields.io/badge/dependencies-0-9b7dff?style=flat-square&labelColor=1a1a2e" alt="zero dependencies" />
   <img src="https://img.shields.io/badge/license-MIT-9b7dff?style=flat-square&labelColor=1a1a2e" alt="license" />
@@ -21,11 +21,11 @@
 
 <p align="center">
   <a href="https://zaydiscold.github.io/real-shadows/">
-    <img src="./assets/demo.gif" alt="a day over san francisco: the shadows under four cards swing right, shorten to nothing at noon, stretch left through the afternoon, then fade as the moon takes over" width="760" />
+    <img src="./assets/film.gif" alt="a day over san francisco: the sun crosses a horizon dial while the shadows under five cards swing right, shorten at noon and rake left. at sunset the moon is already rising in the east, the page sweeps to night, and the same instant is shown in tokyo, mumbai, sydney and london" width="800" />
   </a>
 </p>
 
-<p align="center"><sub>one day over san francisco. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a></sub></p>
+<p align="center"><sub>one day over san francisco, then one instant in four other skies. every number on screen is the library's. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a></sub></p>
 
 <br>
 <br>
@@ -49,7 +49,7 @@ offset instead of disappearing.
 
 no network calls, no permissions, no dependencies. the astronomy is computed
 locally from the clock, so it works offline, in node, and in any framework or
-none. 3.9 kB gzipped as an es module, 3.2 kB as the script-tag build
+none. 4.6 kB gzipped as an es module, 3.6 kB as the script-tag build
 (checked by `npm run size`).
 
 it also stamps `data-sky="day|golden|dusk|night"` and `data-sun="up|down"` on the
@@ -224,6 +224,10 @@ starts the loop, writes the variables, returns a handle.
 | `moon` | `true` | let the moon cast at night; `false` goes straight to the neutral shadow. |
 | `minLength`, `maxLength` | `3.8`, `11.4` | offset in px at zenith and at the horizon. |
 | `facing` | `'auto'` | which horizon the viewer faces; see below. |
+| `twilight` | `true` | carry the shadow continuously through dusk and dawn instead of snapping at the horizon. the afterglow keeps casting from the sun's azimuth until civil dusk (−6°) while the moon fades in. `false` is the hard handoff. |
+| `view` | `'front'` | `'front'`: the page is a wall you face, shadows lean east or west and fall down the page. `'top'`: the page is the ground seen from above, and the shadow points straight away from the light through the full circle, north up. |
+| `heading` | `0` | for `view: 'top'`: compass bearing of the top of the screen. `handle.setHeading(deg)` updates it live from a device compass. |
+| `height` | off | px off the page. when set, length is the real projection `height / tan(altitude)`, capped at `maxLength`. |
 | `tint` | `false` | also write `--rs-tint`, an `r g b` triplet: neutral black under the sun, cool blue-gray under the moon. moonlight is physically a touch redder than sunlight, but night vision is rod-driven and blue-biased (the purkinje shift), so moonlit scenes read cold. use it as `box-shadow: ... rgb(var(--rs-tint) / var(--rs-alpha))`. |
 
 the handle: `refresh()` recomputes now, `setLocation(lat, lon)` moves,
@@ -242,6 +246,7 @@ all pure, no dom, importable anywhere: canvas, webgl, or your own applier.
 | `sunPosition(date, lat, lon)` | `{ altitude, azimuth }` degrees; azimuth clockwise from north |
 | `moonPosition(date, lat, lon)` | `{ altitude, azimuth }`, parallax-corrected |
 | `moonIllumination(date)` | `{ fraction, phase, waxing }` |
+| `moonBrightLimb(date, lat, lon)` | degrees clockwise from the top of the disc to the lit edge, as the observer sees it. 90 lit on the right, 180 lit underneath like a bowl. draws a moon glyph that leans the way the real one does. within 3° of astronomy-engine |
 
 ### which way is the viewer facing
 
@@ -334,14 +339,18 @@ the screen can be checked by hand:
 | length | `min + (max − min) · (1 − alt/90)^1.45` | monotonic-in-altitude unit test |
 | offset x | `±sin(azimuth) · length` — the light's true east-west lean; sign from `facing` | model units, signs checked in the demo |
 | offset y | `(0.4 + 0.6 · sin(alt)) · length` — stylised, always down the page | model units |
-| opacity | `(0.17 + 0.83 · sin(alt)) · intensity`, clamped 0–1 | clamp tests |
+| opacity | `(0.17 + 0.83 · sin(alt)) · intensity`, floored at 0.17, clamped to 1 | clamp and floor tests |
 | blur | `round((1 − sin alt)² · 2)` px | bounds test |
 | moon intensity | lunar phase law (allen), fourth-root compressed: full 1.0, half ~0.55 | scaling test |
 | sundial | `(azimuth + 180) − atan2(dx, −dy)`, mod 360 | round trip < 0.01° over 500 random places and moments |
 
-the handoff rule threading them together: sun casts down to −0.833° (the
-refracted horizon), then the moon if it is up, else the neutral fallback
-`(minLength, minLength, minAlpha)`.
+the handoff rule threading them together: the sun casts down to −0.833° (the
+refracted horizon). below that the three lights are blended, not swapped:
+`w_sun = 1 − S((−0.833° − alt) / 5.167°)` fades the afterglow out by civil
+dusk, `w_moon = (1 − w_sun) · S(moonAlt / 4°)` fades the moon in, and whatever
+is left goes to the neutral fallback `(minLength, minLength, minAlpha)`.
+`S(u) = 3u² − 2u³`. a test walks 40 days in three cities minute by minute and
+asserts the shadow never moves more than 2px in a step.
 
 <br>
 <br>
@@ -371,7 +380,11 @@ three steps, all local arithmetic:
    the horizon, where real shadows genuinely diffuse (blur ≤ 2px).
 
 3. **the handoff.** when the sun drops below −0.833° (the refracted horizon:
-   sunset as your eyes define it), the moon takes over if it's up. its strength
+   sunset as your eyes define it), the moon starts to take over if it's up. it
+   is a crossfade, not a switch: a near-full moon rises opposite the setting
+   sun, so a hard swap would throw every shadow across the page in one step.
+   the afterglow keeps casting from the sun's azimuth until civil dusk (−6°)
+   while the moon fades in. its strength
    follows the real lunar phase law (a half moon is 9% as bright as full, not
    50: rough terrain shadows itself at every angle except opposition),
    compressed with a fourth root so partial phases stay visible, times a 0.7

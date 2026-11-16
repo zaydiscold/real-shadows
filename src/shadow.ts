@@ -61,6 +61,39 @@ export interface ShadowOptions {
    * so moonlit scenes read cold; the tint follows perception.
    */
   tint?: boolean;
+  /**
+   * Carry the shadow smoothly through twilight. Default true.
+   *
+   * A hard handoff at sunset snaps the shadow from one side of the page to
+   * the other in a single step, which nothing in the sky does. With this on,
+   * the sun's shadow relaxes through civil twilight (the afterglow still
+   * comes from where the sun went down) while the moon's fades in as the sky
+   * darkens, and a rising or setting moon eases in and out over its first
+   * four degrees. `false` restores the hard handoff.
+   */
+  twilight?: boolean;
+  /**
+   * How the sky is flattened onto the screen. Default `front`.
+   *
+   * `front` treats the page as a wall you face: only the light's east-west
+   * lean shows, and shadows always fall down the page. `top` treats the page
+   * as the ground seen from above: the shadow points directly away from the
+   * light through the full circle, north up, exactly as it would under a
+   * stick in the dirt. Lay a phone flat with `heading` set to its compass
+   * heading and the shadows on screen run parallel to the real ones.
+   */
+  view?: 'front' | 'top';
+  /**
+   * Compass bearing of the top of the screen in degrees, for `view: 'top'`.
+   * Default 0, north up.
+   */
+  heading?: number;
+  /**
+   * Height of the caster off the page in px. When set, length follows the
+   * real projection `height / tan(altitude)` (capped at `maxLength`) in
+   * place of the stylised curve: nothing at the zenith, long at the horizon.
+   */
+  height?: number;
 }
 
 /** A resolved shadow: where it falls, how dark it is, and what is casting it. */
@@ -98,6 +131,10 @@ const DEFAULTS = {
   moonIntensity: 0.7,
   facing: 'auto' as Facing,
   tint: false,
+  twilight: true,
+  view: 'front' as 'front' | 'top',
+  heading: 0,
+  height: 0,
 };
 
 /** Cool blue-gray for moonlit shadows; see the `tint` option. */
@@ -115,6 +152,75 @@ const round2 = (x: number): number => Math.round(x * 100) / 100;
  * sun looks like it is setting when its centre is already this far down.
  */
 const SUNSET_ALTITUDE = -0.833;
+
+/** The end of civil twilight: the afterglow has stopped casting by here. */
+const CIVIL_DUSK = -6;
+
+/** Altitude over which a rising or setting moon eases in and out. */
+const MOON_EASE = 4;
+
+const smoothstep = (u: number): number => {
+  const x = clamp(u, 0, 1);
+  return x * x * (3 - 2 * x);
+};
+
+/** The unrounded shadow one light casts: where it falls and how dark it is. */
+interface Cast {
+  dx: number;
+  dy: number;
+  blur: number;
+  alpha: number;
+}
+
+function castFrom(
+  altitude: number,
+  azimuth: number,
+  intensity: number,
+  o: typeof DEFAULTS,
+  lat: number,
+): Cast {
+  const elevation = clamp(altitude, 0, 90);
+  const overhead = sind(elevation); // 0 on the horizon, 1 at the zenith
+
+  // Length depends only on how high the light is. Brightness, not geometry,
+  // is what changes when the moon takes over.
+  const length =
+    o.height > 0
+      ? clamp(o.height / Math.tan(Math.max(elevation, 0.5) * D2R), 0, o.maxLength)
+      : o.minLength + (o.maxLength - o.minLength) * Math.pow(1 - elevation / 90, o.falloff);
+
+  let dx: number;
+  let dy: number;
+  if (o.view === 'top') {
+    // The page is the ground: the shadow points straight away from the light.
+    const relative = (azimuth - o.heading) * D2R;
+    dx = -Math.sin(relative) * length;
+    dy = Math.cos(relative) * length;
+  } else {
+    // A screen can only show the light's east-west lean, so the vertical
+    // component is a stylisation: shadows always fall down the page, deepest
+    // when the light is highest. Physical accuracy here would send shadows up
+    // the screen half the year, which reads as broken rather than correct.
+    dx = facingSign(o.facing, lat) * Math.sin(azimuth * D2R) * length;
+    dy = (0.4 + 0.6 * overhead) * length;
+  }
+
+  // The floor is the "nothing up" opacity. Without it a thin moon on the
+  // horizon cast a fainter shadow (down to 0.02) than no moon at all (0.17),
+  // so the page lost depth at moonrise and got it back at moonset.
+  const floor = Math.min(o.minAlpha, o.maxAlpha);
+  const alpha = clamp(
+    Math.max((o.minAlpha + (o.maxAlpha - o.minAlpha) * overhead) * intensity, floor),
+    0,
+    1,
+  );
+
+  // Edges stay hard except for a whisper at grazing angles, where a real
+  // shadow genuinely does diffuse.
+  const blur = (1 - overhead) * (1 - overhead) * o.maxBlur;
+
+  return { dx, dy, blur, alpha };
+}
 
 /** Resolve which way is left on screen: +1 facing south, -1 facing north. */
 function facingSign(facing: Facing, lat: number): 1 | -1 {
@@ -162,62 +268,67 @@ export function shadowVector(
 
   const sun = sunPosition(when, lat, lon);
   const sunAltitude = sun.altitude;
+  const sunUp = sunAltitude >= SUNSET_ALTITUDE;
 
-  let source: ShadowSource;
-  let altitude: number;
-  let azimuth: number;
-  let intensity: number;
+  // How much of the shadow still belongs to the sun. Below the horizon it is
+  // the afterglow casting, from the sun's own azimuth, fading out by the end
+  // of civil twilight.
+  const sunWeight = sunUp
+    ? 1
+    : o.twilight
+      ? 1 - smoothstep((SUNSET_ALTITUDE - sunAltitude) / (SUNSET_ALTITUDE - CIVIL_DUSK))
+      : 0;
 
-  if (sunAltitude >= SUNSET_ALTITUDE) {
-    source = 'sun';
-    altitude = sun.altitude;
-    azimuth = sun.azimuth;
-    intensity = 1;
-  } else if (o.moon) {
-    const moon = moonPosition(when, lat, lon);
-    if (moon.altitude > 0) {
-      source = 'moon';
-      altitude = moon.altitude;
-      azimuth = moon.azimuth;
-      intensity = o.moonIntensity * moonBrightness(moonIllumination(when).fraction);
-    } else {
-      return nothingUp(o, sunAltitude);
+  let moon: { altitude: number; azimuth: number } | null = null;
+  let moonIntensity = 0;
+  if (!sunUp && o.moon) {
+    const m = moonPosition(when, lat, lon);
+    if (m.altitude > 0) {
+      moon = m;
+      moonIntensity = o.moonIntensity * moonBrightness(moonIllumination(when).fraction);
     }
-  } else {
-    return nothingUp(o, sunAltitude);
+  }
+  const moonWeight = moon
+    ? (1 - sunWeight) * (o.twilight ? smoothstep(moon.altitude / MOON_EASE) : 1)
+    : 0;
+  const ambientWeight = 1 - sunWeight - moonWeight;
+
+  const source: ShadowSource = sunUp ? 'sun' : moon ? 'moon' : 'none';
+  if (source === 'none' && ambientWeight >= 1) return nothingUp(o, sunAltitude);
+
+  // Blend whatever is casting. In full day and full night exactly one term
+  // survives, so those are the plain sun and moon shadows; in between the
+  // vector travels continuously instead of snapping.
+  let dx = ambientWeight * o.minLength;
+  let dy = ambientWeight * o.minLength;
+  let blur = ambientWeight * o.maxBlur;
+  let alpha = ambientWeight * o.minAlpha;
+  if (sunWeight > 0) {
+    const c = castFrom(sunAltitude, sun.azimuth, 1, o, lat);
+    dx += sunWeight * c.dx;
+    dy += sunWeight * c.dy;
+    blur += sunWeight * c.blur;
+    alpha += sunWeight * c.alpha;
+  }
+  if (moon && moonWeight > 0) {
+    const c = castFrom(moon.altitude, moon.azimuth, moonIntensity, o, lat);
+    dx += moonWeight * c.dx;
+    dy += moonWeight * c.dy;
+    blur += moonWeight * c.blur;
+    alpha += moonWeight * c.alpha;
   }
 
-  const elevation = clamp(altitude, 0, 90);
-  const overhead = sind(elevation); // 0 on the horizon, 1 at the zenith
-
-  // Length depends only on how high the light is. Brightness, not geometry,
-  // is what changes when the moon takes over.
-  const length =
-    o.minLength + (o.maxLength - o.minLength) * Math.pow(1 - elevation / 90, o.falloff);
-
-  // A screen can only show the light's east-west lean, so the vertical
-  // component is a stylisation: shadows always fall down the page, deepest
-  // when the light is highest. Physical accuracy here would send shadows up
-  // the screen half the year, which reads as broken rather than correct.
-  const dx = facingSign(o.facing, lat) * Math.sin(azimuth * D2R) * length;
-  const dy = (0.4 + 0.6 * overhead) * length;
-
-  const alpha = clamp((o.minAlpha + (o.maxAlpha - o.minAlpha) * overhead) * intensity, 0, 1);
-
-  // Edges stay hard except for a whisper at grazing angles, where a real
-  // shadow genuinely does diffuse.
-  const blur = Math.round((1 - overhead) * (1 - overhead) * o.maxBlur);
-
+  const caster = source === 'sun' ? sun : moon;
   return {
     source,
     dx: round2(dx),
     dy: round2(dy),
-    blur,
+    blur: Math.round(blur),
     alpha: round2(alpha),
-    altitude: round2(altitude),
-    azimuth: round2(azimuth),
+    altitude: caster ? round2(caster.altitude) : null,
+    azimuth: caster ? round2(caster.azimuth) : null,
     sunAltitude: round2(sunAltitude),
-    intensity: round2(intensity),
+    intensity: source === 'sun' ? 1 : source === 'moon' ? round2(moonIntensity) : 0,
     tint: o.tint && source === 'moon' ? MOON_TINT : NEUTRAL_TINT,
   };
 }

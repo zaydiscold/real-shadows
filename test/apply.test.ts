@@ -133,3 +133,37 @@ describe('realShadows', () => {
     handle = null;
   });
 });
+
+describe('option guards', () => {
+  it('falls back to the default interval for 0, NaN and negatives', () => {
+    vi.useFakeTimers();
+    for (const interval of [0, Number.NaN, -5]) {
+      let calls = 0;
+      const h = realShadows({ ...SF, now: NOON, interval, onUpdate: () => calls++ });
+      vi.advanceTimersByTime(60_000);
+      h.stop();
+      // one write at start, none from a runaway timer
+      expect(calls).toBe(1);
+    }
+  });
+
+  it('falls back to the rs prefix when the prefix is unusable', () => {
+    for (const prefix of ['', '1x', 'a b']) {
+      const el = document.createElement('div');
+      const h = realShadows({ ...SF, now: NOON, element: el, prefix });
+      expect(el.style.getPropertyValue('--rs-x')).toMatch(/px$/);
+      h.stop();
+    }
+  });
+});
+
+describe('setHeading', () => {
+  it('rewrites the variables for a top view', () => {
+    const el = document.createElement('div');
+    const h = realShadows({ ...SF, now: NOON, element: el, view: 'top' });
+    const before = el.style.getPropertyValue('--rs-x');
+    h.setHeading(90);
+    expect(el.style.getPropertyValue('--rs-x')).not.toBe(before);
+    h.stop();
+  });
+});

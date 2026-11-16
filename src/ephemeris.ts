@@ -338,3 +338,43 @@ export function moonIllumination(date: Date): MoonIllumination {
 
   return { fraction, phase, waxing };
 }
+
+/**
+ * Which way the lit edge of the moon faces, for an observer looking at it.
+ *
+ * Returns degrees clockwise from the top of the disc (the point nearest the
+ * zenith) to the middle of the bright limb, as it appears in the sky: 90 is
+ * lit on the right, 270 lit on the left, 0 lit on top like a dome, 180 lit
+ * underneath like a bowl.
+ *
+ * The lit edge always points at the sun. Measured from celestial north that
+ * direction is the position angle of the bright limb; what turns it for a
+ * given observer is the parallactic angle, how far "up" is rotated from
+ * celestial north where the moon sits in their sky. That rotation is why a
+ * crescent lies on its back like a boat near the equator, stands upright at
+ * high latitudes, and appears mirrored in the southern hemisphere.
+ *
+ * Near full and near new the limb direction is poorly defined (there is no
+ * terminator to speak of); the value is still returned, it just stops
+ * mattering visually.
+ */
+export function moonBrightLimb(date: Date, lat: number, lon: number): number {
+  const jd = toJulian(date);
+  const sun = solveSun(jd);
+  const moon = solveMoon(jd, sun);
+
+  // position angle of the bright limb, counterclockwise from celestial north
+  const dRa = sun.ra - moon.ra;
+  const limb = atan2d(
+    cosd(sun.dec) * sind(dRa),
+    sind(sun.dec) * cosd(moon.dec) - cosd(sun.dec) * sind(moon.dec) * cosd(dRa),
+  );
+
+  // parallactic angle: celestial north against the observer's zenith
+  const H = localSiderealTime(jd, lon) - moon.ra;
+  const parallactic = atan2d(sind(H), Math.tan(lat * D2R) * cosd(moon.dec) - sind(moon.dec) * cosd(H));
+
+  // position angles run counterclockwise on the sky (east is to the left);
+  // flip the sense so the result reads clockwise on a screen
+  return rev(-(limb - parallactic));
+}

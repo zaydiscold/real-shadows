@@ -242,3 +242,89 @@ describe('compassLabel', () => {
     expect(compassLabel(202.5)).toBe('ssw');
   });
 });
+
+describe('the opacity floor', () => {
+  it('never lets a moon-cast shadow fall below the nothing-up opacity', () => {
+    // a 2 percent moon just clearing the horizon: used to resolve to 0.02
+    const thin = shadowVector(new Date('2026-01-17T15:05:00Z'), 37.77, -122.42);
+    expect(thin.source).toBe('moon');
+    expect(thin.alpha).toBeGreaterThanOrEqual(0.17);
+
+    let lowest = 1;
+    for (let i = 0; i < 4000; i++) {
+      const v = shadowVector(new Date(Date.UTC(2026, 0, 1) + i * 131 * 60000), 37.77, -122.42);
+      lowest = Math.min(lowest, v.alpha);
+    }
+    expect(lowest).toBeGreaterThanOrEqual(0.17);
+  });
+});
+
+describe('twilight continuity', () => {
+  // the largest step in the shadow offset between consecutive minutes
+  const worstStep = (options: Parameters<typeof shadowVector>[3]) => {
+    let worst = 0;
+    for (const [lat, lon] of [[37.77, -122.42], [-33.87, 151.21], [64.15, -21.94]] as const) {
+      let prev = shadowVector(new Date(Date.UTC(2026, 2, 1)), lat, lon, options);
+      for (let m = 1; m < 60 * 24 * 40; m++) {
+        const v = shadowVector(new Date(Date.UTC(2026, 2, 1) + m * 60000), lat, lon, options);
+        worst = Math.max(worst, Math.hypot(v.dx - prev.dx, v.dy - prev.dy));
+        prev = v;
+      }
+    }
+    return worst;
+  };
+
+  it('never jumps: sunset, sunrise, moonrise and moonset are all continuous', () => {
+    // the hard handoff snapped ~22px in one step; the fastest minute of the
+    // twilight crossfade now moves about a pixel and a half
+    expect(worstStep({})).toBeLessThan(2);
+  });
+
+  it('twilight: false restores the hard handoff', () => {
+    expect(worstStep({ twilight: false })).toBeGreaterThan(15);
+  });
+
+  it('leaves full day and full night untouched', () => {
+    const noon = new Date('2026-06-21T20:00:00Z');
+    expect(shadowVector(noon, 37.77, -122.42)).toEqual(
+      shadowVector(noon, 37.77, -122.42, { twilight: false }),
+    );
+    const moonHigh = new Date('2026-06-28T07:00:00Z'); // midnight pdt, moon at 23 degrees
+    expect(shadowVector(moonHigh, 37.77, -122.42)).toEqual(
+      shadowVector(moonHigh, 37.77, -122.42, { twilight: false }),
+    );
+  });
+});
+
+describe('view: top', () => {
+  const NOON = new Date('2026-06-21T20:00:00Z');
+
+  it('points the shadow straight away from the light, north up', () => {
+    for (let h = 14; h < 27; h++) {
+      const when = new Date(Date.UTC(2026, 5, 21, h));
+      const v = shadowVector(when, 37.77, -122.42, { view: 'top' });
+      if (v.source !== 'sun' || v.azimuth === null) continue;
+      // screen angle clockwise from up, against the true shadow bearing
+      const screen = (Math.atan2(v.dx, -v.dy) * 180) / Math.PI;
+      const diff = ((screen - (v.azimuth + 180)) % 360 + 540) % 360 - 180;
+      expect(Math.abs(diff)).toBeLessThan(0.2);
+    }
+  });
+
+  it('rotates with heading', () => {
+    const north = shadowVector(NOON, 37.77, -122.42, { view: 'top' });
+    const east = shadowVector(NOON, 37.77, -122.42, { view: 'top', heading: 90 });
+    // turning the device a quarter turn clockwise turns the shadow a quarter turn back
+    expect(east.dx).toBeCloseTo(north.dy, 1);
+    expect(east.dy).toBeCloseTo(-north.dx, 1);
+  });
+
+  it('height follows the real projection, capped at maxLength', () => {
+    const when = new Date('2026-06-21T16:00:00Z'); // 9am pdt
+    const v = shadowVector(when, 37.77, -122.42, { view: 'top', height: 10, maxLength: 500 });
+    const expected = 10 / Math.tan(((v.altitude as number) * Math.PI) / 180);
+    expect(Math.hypot(v.dx, v.dy)).toBeCloseTo(expected, 1);
+    const capped = shadowVector(when, 37.77, -122.42, { view: 'top', height: 1000, maxLength: 40 });
+    expect(Math.hypot(capped.dx, capped.dy)).toBeCloseTo(40, 1);
+  });
+});

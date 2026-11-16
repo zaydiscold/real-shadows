@@ -12,6 +12,7 @@ export {
   sunPosition,
   moonPosition,
   moonIllumination,
+  moonBrightLimb,
   type Horizontal,
   type Equatorial,
   type MoonIllumination,

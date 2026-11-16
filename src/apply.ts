@@ -45,15 +45,24 @@ export interface RealShadowsHandle {
   refresh(): ShadowVector;
   /** Move to a new location and rewrite immediately. */
   setLocation(lat: number, lon: number): ShadowVector;
+  /**
+   * Set the compass bearing of the top of the screen and rewrite immediately.
+   * Only meaningful with `view: 'top'`; feed it a device compass heading and
+   * the shadows on screen stay parallel to the real ones as the device turns.
+   */
+  setHeading(degrees: number): ShadowVector;
   /** The vector written by the most recent update. */
   current(): ShadowVector | null;
   /** Stop updating and remove everything this handle wrote. */
   stop(): void;
 }
 
+const DEFAULT_INTERVAL = 5 * 60 * 1000;
+
 const NOOP_HANDLE: RealShadowsHandle = {
   refresh: () => nullVector(),
   setLocation: () => nullVector(),
+  setHeading: () => nullVector(),
   current: () => null,
   stop: () => {},
 };
@@ -96,16 +105,29 @@ export function realShadows(options: RealShadowsOptions): RealShadowsHandle {
 
   const {
     element = document.documentElement,
-    prefix = 'rs',
-    interval = 5 * 60 * 1000,
     attributes = true,
     now,
     onUpdate,
+    prefix: prefixOption,
+    interval: intervalOption,
     ...shadowOptions
   } = options;
 
+  // A prefix that is not a usable identifier would write properties no rule
+  // can read (`---x`), so anything else falls back to the default.
+  const prefix =
+    typeof prefixOption === 'string' && /^[A-Za-z_][\w-]*$/.test(prefixOption) ? prefixOption : 'rs';
+
+  // setInterval treats 0, NaN and negatives as "as fast as possible", which
+  // turns a typo into a loop recomputing the sky hundreds of times a second.
+  const interval =
+    typeof intervalOption === 'number' && Number.isFinite(intervalOption) && intervalOption > 0
+      ? intervalOption
+      : DEFAULT_INTERVAL;
+
   let lat = options.lat;
   let lon = options.lon;
+  let heading = shadowOptions.heading;
   let latest: ShadowVector | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
@@ -123,7 +145,7 @@ export function realShadows(options: RealShadowsOptions): RealShadowsHandle {
     // resurrect the variables that stop() just removed
     if (stopped) return latest ?? nullVector();
     const when = clock();
-    const v = shadowVector(when, lat, lon, shadowOptions);
+    const v = shadowVector(when, lat, lon, { ...shadowOptions, heading });
 
     const style = element.style;
     style.setProperty(varName('x'), `${v.dx}px`);
@@ -166,6 +188,10 @@ export function realShadows(options: RealShadowsOptions): RealShadowsHandle {
     setLocation(nextLat: number, nextLon: number): ShadowVector {
       lat = nextLat;
       lon = nextLon;
+      return write();
+    },
+    setHeading(degrees: number): ShadowVector {
+      if (Number.isFinite(degrees)) heading = degrees;
       return write();
     },
     current: () => latest,
