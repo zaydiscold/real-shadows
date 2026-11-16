@@ -14,18 +14,18 @@
 </p>
 
 <p align="center">
-  <a href="#what-it-does">what it does</a> · <a href="#install">install</a> · <a href="#quickstart">quickstart</a> · <a href="#api">api</a> · <a href="#accuracy">accuracy</a> · <a href="#the-sundial">the sundial</a> · <a href="#every-number-one-line">the numbers</a> · <a href="#how-the-math-works">how the math works</a>
+  <a href="#what-it-does">what it does</a> · <a href="#install">install</a> · <a href="#quickstart">quickstart</a> · <a href="#from-a-terminal">cli</a> · <a href="#api">api</a> · <a href="#accuracy">accuracy</a> · <a href="#the-sundial">the sundial</a> · <a href="#the-sky-dial">the sky dial</a> · <a href="#every-number-one-line">the numbers</a> · <a href="#how-the-math-works">how the math works</a>
 </p>
 
 <br>
 
 <p align="center">
   <a href="https://zaydiscold.github.io/real-shadows/">
-    <img src="./assets/film.gif" alt="a day over san francisco: the sun crosses a horizon dial while the shadows under five cards swing right, shorten at noon and rake left. at sunset the moon is already rising in the east, the page sweeps to night, and the same instant is shown in tokyo, mumbai, sydney and london" width="800" />
+    <img src="./assets/film.gif" alt="a day over san francisco: the sun crosses a horizon dial while the shadows under five cards shorten at noon and rake left. at sunset the moon is already rising in the east, the page sweeps to a starry night and the moon swings the shadows back the other way. then the same instant is shown in tokyo, mumbai, london and sydney" width="800" />
   </a>
 </p>
 
-<p align="center"><sub>one day over san francisco, then one instant in four other skies. every number on screen is the library's. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a> · <a href="./assets/film.mp4">full film, 1080p mp4</a></sub></p>
+<p align="center"><sub>a day and a night over san francisco, then one instant in four other skies. every number on screen is the library's. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a> · <a href="./assets/film.mp4">full film, 1080p mp4</a></sub></p>
 
 <br>
 
@@ -39,8 +39,8 @@
     <td><sub><b>sunset.</b> the sun is on the horizon and the moon is already up behind you. through twilight the shadows keep the afterglow's direction while the moon fades in, so nothing jumps.</sub></td>
   </tr>
   <tr>
-    <td><img src="./assets/still-sweep.jpg" alt="21:12 in san francisco: the moon has taken over casting, and the page sweeps to its night theme" /></td>
-    <td><img src="./assets/still-night.jpg" alt="22:30: the 97 percent lit moon high in the south casts faint, soft shadows" /></td>
+    <td><img src="./assets/still-sweep.jpg" alt="dusk in san francisco: the moon has taken over casting, and the page sweeps to its night theme" /></td>
+    <td><img src="./assets/still-night.jpg" alt="just after midnight: the 97 percent lit moon high in the south casts faint, soft shadows under a field of stars" /></td>
   </tr>
   <tr>
     <td><sub><b>handoff.</b> the moon has the shadows now, and the page turns to its night theme from the real sky (<code>data-sky</code>, <code>data-sun</code>), not from a fixed hour.</sub></td>
@@ -106,9 +106,75 @@ or skip the install entirely, straight from a cdn, no build step:
 
 `@1` pins the major version, so you get fixes but never a breaking change.
 
-want to see the numbers before installing anything? `npx` runs a package's
-command without installing it, so this prints the shadow being cast over a
-location right now:
+## quickstart
+
+one call, one css line:
+
+```js
+import { realShadows } from 'real-shadows';
+
+realShadows({ lat: 37.77, lon: -122.42 });
+```
+
+```css
+.card {
+  box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgb(0 0 0 / var(--rs-alpha));
+}
+```
+
+that's the whole integration. the library refreshes every five minutes (the
+movement between refreshes is sub-pixel, so nothing visibly jumps), recomputes
+when a laptop wakes, and pauses while the tab is hidden.
+
+theming hooks, if you want them:
+
+```css
+[data-sky='golden'] body { background: #f2e9d8; }   /* golden hour tint */
+[data-sun='down'] body   { background: #17171c; }   /* dark when the sun is actually down */
+```
+
+### where the location comes from
+
+the library never asks for a location. you pass one in; the three usual sources:
+
+```js
+// 1. hardcode a place (a city center is plenty; accuracy is city-level anyway)
+realShadows({ lat: 51.51, lon: -0.13 });
+
+// 2. ask the browser (requires a permission prompt)
+navigator.geolocation.getCurrentPosition((p) =>
+  realShadows({ lat: p.coords.latitude, lon: p.coords.longitude }),
+);
+
+// 3. an ip-geo service you already use, or your server's geo headers
+```
+
+### a shadow scale
+
+the library writes one offset, the shadow cast by something sitting on the page.
+design systems usually want a scale, and a scale falls out of multiplying it: a
+thing twice as far off the page throws a shadow twice as long. `calc()` does the
+whole job, no extra api.
+
+```css
+:root {
+  --sm: 0.6;  /* resting on the surface */
+  --md: 1;    /* the library's own offset */
+  --lg: 2.2;  /* lifted, a modal or a drag */
+}
+.card   { box-shadow: calc(var(--rs-x) * var(--sm)) calc(var(--rs-y) * var(--sm))
+                      var(--rs-blur) rgb(0 0 0 / var(--rs-alpha)); }
+.dialog { box-shadow: calc(var(--rs-x) * var(--lg)) calc(var(--rs-y) * var(--lg))
+                      calc(var(--rs-blur) * var(--lg)) rgb(0 0 0 / var(--rs-alpha)); }
+```
+
+every tier stays on the same sun, so the whole page reads as one light source at
+one moment. that is the part a static shadow scale cannot do.
+
+## from a terminal
+
+`npx` runs the package's command without installing it, so this prints the
+shadow being cast over a location right now:
 
 ```bash
 npx real-shadows 37.77 -122.42
@@ -153,69 +219,6 @@ sundial  aim device top 189deg (s)
 the caster hands off to the moon on its own. opacity drops from 0.95 to 0.3, and
 the edge picks up a 1px blur because the moon is low. `--json` gives the same
 thing machine-readable.
-
-## quickstart
-
-one call, one css line:
-
-```js
-import { realShadows } from 'real-shadows';
-
-realShadows({ lat: 37.77, lon: -122.42 });
-```
-
-```css
-.card {
-  box-shadow: var(--rs-x) var(--rs-y) var(--rs-blur) rgb(0 0 0 / var(--rs-alpha));
-}
-```
-
-that's the whole integration. the library refreshes every five minutes (the
-movement between refreshes is sub-pixel, so nothing visibly jumps), recomputes
-when a laptop wakes, and pauses while the tab is hidden.
-
-theming hooks, if you want them:
-
-```css
-[data-sky='golden'] body { background: #f2e9d8; }   /* golden hour tint */
-[data-sun='down'] body   { background: #17171c; }   /* dark when the sun is actually down */
-```
-
-### a shadow scale
-
-the library writes one offset, the shadow cast by something sitting on the page.
-design systems usually want a scale, and a scale falls out of multiplying it: a
-thing twice as far off the page throws a shadow twice as long. `calc()` does the
-whole job, no extra api.
-
-```css
-:root {
-  --sm: 0.6;  /* resting on the surface */
-  --md: 1;    /* the library's own offset */
-  --lg: 2.2;  /* lifted, a modal or a drag */
-}
-.card   { box-shadow: calc(var(--rs-x) * var(--sm)) calc(var(--rs-y) * var(--sm))
-                      var(--rs-blur) rgb(0 0 0 / var(--rs-alpha)); }
-.dialog { box-shadow: calc(var(--rs-x) * var(--lg)) calc(var(--rs-y) * var(--lg))
-                      calc(var(--rs-blur) * var(--lg)) rgb(0 0 0 / var(--rs-alpha)); }
-```
-
-every tier stays on the same sun, so the whole page reads as one light source at
-one moment. that is the part a static shadow scale cannot do.
-
-the library never asks for a location. you pass one in; the three usual sources:
-
-```js
-// 1. hardcode a place (a city center is plenty; accuracy is city-level anyway)
-realShadows({ lat: 51.51, lon: -0.13 });
-
-// 2. ask the browser (requires a permission prompt)
-navigator.geolocation.getCurrentPosition((p) =>
-  realShadows({ lat: p.coords.latitude, lon: p.coords.longitude }),
-);
-
-// 3. an ip-geo service you already use, or your server's geo headers
-```
 
 <br>
 <br>
