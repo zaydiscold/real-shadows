@@ -27,6 +27,8 @@
 - `interval` of 0, NaN or a negative number falls back to five minutes instead
   of handing setInterval a runaway loop
 - an empty or invalid `prefix` falls back to `rs` instead of writing `---x`
+- readme: the twilight film (gif and 1080p mp4), four stills from it, and the
+  sky dial from zayd.wtf scrubbed through a full day
 
 ## 1.1.1
 

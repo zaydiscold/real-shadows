@@ -25,7 +25,28 @@
   </a>
 </p>
 
-<p align="center"><sub>one day over san francisco, then one instant in four other skies. every number on screen is the library's. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a></sub></p>
+<p align="center"><sub>one day over san francisco, then one instant in four other skies. every number on screen is the library's. <a href="https://zaydiscold.github.io/real-shadows/">drag it yourself</a> · <a href="./assets/film.mp4">full film, 1080p mp4</a></sub></p>
+
+<br>
+
+<table>
+  <tr>
+    <td width="50%"><img src="./assets/still-day.jpg" alt="midday over san francisco: the sun high in the south, every card's shadow short and dropping almost straight down" /></td>
+    <td width="50%"><img src="./assets/still-moonrise.jpg" alt="sunset: the sun sits on the west horizon while the moon rises in the east, and the shadows rake long to the east" /></td>
+  </tr>
+  <tr>
+    <td><sub><b>noon.</b> the sun is high, so shadows are short and fall almost straight down.</sub></td>
+    <td><sub><b>sunset.</b> the sun is on the horizon and the moon is already up behind you. through twilight the shadows keep the afterglow's direction while the moon fades in, so nothing jumps.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="./assets/still-sweep.jpg" alt="21:12 in san francisco: the moon has taken over casting, and the page sweeps to its night theme" /></td>
+    <td><img src="./assets/still-night.jpg" alt="22:30: the 97 percent lit moon high in the south casts faint, soft shadows" /></td>
+  </tr>
+  <tr>
+    <td><sub><b>handoff.</b> the moon has the shadows now, and the page turns to its night theme from the real sky (<code>data-sky</code>, <code>data-sun</code>), not from a fixed hour.</sub></td>
+    <td><sub><b>night.</b> the moon carries on, fainter and softer, scaled by how much of it is lit.</sub></td>
+  </tr>
+</table>
 
 <br>
 <br>
@@ -321,15 +342,44 @@ plus on-screen shadow angle equals the true shadow bearing) closes within a
 hundredth of a degree in the test suite, over 500 random places and moments.
 
 the bearing is yours: it depends on where you stand and when you ask, and it
-moves through the day as the sun does. that is not drift, it is the point —
+moves through the day as the sun does. that is not drift, it is the point:
 the on-screen vertical is stylised (always down the page), so the rotation
 that reconciles screen and sky has to change as the light swings. same
 formula, same number, as the sundial on [zayd.wtf](https://zayd.wtf).
 
+## the sky dial
+
+<p align="center">
+  <img src="./assets/sky-dial.gif" alt="a horizon dial scrubbed through 24 hours: the sun and a half-lit moon travel their real arcs from east to west, and the readout underneath says which one is casting the page's shadows" width="800" />
+</p>
+
+<p align="center"><sub>a full day, scrubbed. live on <a href="https://zayd.wtf/unstructured/lesson1/">zayd.wtf</a>, where the same model lights the page.</sub></p>
+
+the same numbers drawn as a picture. the horizon runs east, south, west; the
+sun and the moon sit at their real altitude and azimuth for your location, each
+on the dotted track it will actually follow today, and the moon is drawn lit on
+the side `moonBrightLimb()` says faces the sun. dragging the slider runs the clock
+twelve hours either way, and the line underneath reads what `shadowVector`
+returns: who is up, how high, how much of the moon is lit, and which of them is
+casting the shadows on the page.
+
+everything it needs is public api:
+
+```js
+import { sunPosition, moonPosition, moonIllumination, moonBrightLimb, shadowVector } from 'real-shadows';
+
+const at = new Date();
+const sun = sunPosition(at, lat, lon);      // { altitude, azimuth } in degrees
+const moon = moonPosition(at, lat, lon);    // same shape
+const { fraction } = moonIllumination(at);  // 0 new, 1 full
+const limb = moonBrightLimb(at, lat, lon);  // degrees clockwise from the top of the disc to the lit edge
+const { source } = shadowVector(at, lat, lon); // 'sun' | 'moon' | 'none' | 'default'
+```
+
 ## every number, one line
 
-everything the library reports — in the demo readout and in
-`npx real-shadows` — with the line of math that produces it, so any number on
+everything the library reports (in the demo readout and in
+`npx real-shadows`) with the line of math that produces it, so any number on
 the screen can be checked by hand:
 
 | number | the line | proven by |
@@ -337,8 +387,8 @@ the screen can be checked by hand:
 | caster alt/az | schlyter's classical ephemeris; moon topocentric | oracle in ci vs astronomy-engine: sun < 0.05°, moon < 0.2° |
 | sky | sun altitude bands: ≥ 6° day, ≥ −6° golden, ≥ −12° dusk, else night | handoff tests at fixed dates |
 | length | `min + (max − min) · (1 − alt/90)^1.45` | monotonic-in-altitude unit test |
-| offset x | `±sin(azimuth) · length` — the light's true east-west lean; sign from `facing` | model units, signs checked in the demo |
-| offset y | `(0.4 + 0.6 · sin(alt)) · length` — stylised, always down the page | model units |
+| offset x | `±sin(azimuth) · length`: the light's true east-west lean; sign from `facing` | model units, signs checked in the demo |
+| offset y | `(0.4 + 0.6 · sin(alt)) · length`: stylised, always down the page | model units |
 | opacity | `(0.17 + 0.83 · sin(alt)) · intensity`, floored at 0.17, clamped to 1 | clamp and floor tests |
 | blur | `round((1 − sin alt)² · 2)` px | bounds test |
 | moon intensity | lunar phase law (allen), fourth-root compressed: full 1.0, half ~0.55 | scaling test |
